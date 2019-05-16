@@ -1,0 +1,2 @@
+# LinkedIn Profile to JSON Resume Bookmarklet
+WIP at the moment. Building as a bookmarklet Proof-of-Concept that uses data from the page / local APIs, since the official LinkedIn API requires a long approval process to get access to the necessary profile fields.

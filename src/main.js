@@ -45,6 +45,7 @@ var resumeJsonTemplate = {
 		}
 	],
 	"education": [
+        /*
 		{
 			"institution" : "",
 			"area" : "",
@@ -53,7 +54,8 @@ var resumeJsonTemplate = {
 			"endDate" : "",
 			"gpa" : "",
 			"courses": []
-		}
+        }
+        */
 	],
 	"awards": [
 		{
@@ -103,9 +105,64 @@ var linkedinToResumeJson = (function(){
     // private
     var _outputJson = resumeJsonTemplate;
     var _templateJson = resumeJsonTemplate;
+    var _liSchemaKeys = {
+        certificates : '*certificationView',
+        education: '*educationView',
+        workPositions: '*positionGroupView'
+    }
     function getCookie(name) {
         var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
         return v ? v[2] : null;
+    }
+    function noNull(value,OPT_defaultVal){
+        var defaultVal = (OPT_defaultVal || '');
+        return value===null ? '' : defaultVal;
+    }
+    function safeString(value){
+        value = (value || '');
+        if (typeof(value)==='object'){
+            value = JSON.stringify(value);
+        }
+        else {
+            value = value.toString();
+        }
+        return value;
+    }
+    function buildDbFromLiSchema(schemaJson){
+        var template = {
+            tableOfContents : {},
+            data : {
+                /*
+                key : {
+                    key : '',
+                    $type : '',
+                    ...
+                }
+                */
+            }
+        }
+        var db = template;
+        db.tableOfContents = schemaJson.data;
+        for (var x=0; x<schemaJson.included.length; x++){
+            var currRow = schemaJson.included[x];
+            currRow.key = currRow.entityUrn;
+            db.data[currRow.entityUrn] = currRow;
+        }
+        db.getValuesByKey = function(key){
+            var values = [];
+            var tocVal = this.tableOfContents[key]
+            if(tocVal){
+                var subToc = this.data[tocVal];
+                if (subToc['*elements'] && Array.isArray(subToc['*elements'])){
+                    var matchingDbIndexs = subToc['*elements'];
+                    for (var x=0; x<matchingDbIndexs.length; x++){
+                        values.push(this.data[matchingDbIndexs[x]]);
+                    }
+                }
+            }
+            return values;
+        }
+        return db;
     }
     // Constructor
     function linkedinToResumeJson(){
@@ -118,16 +175,70 @@ var linkedinToResumeJson = (function(){
     linkedinToResumeJson.prototype.parseEmbeddedLiSchema = function(){
         var possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
         for (var x=0; x<possibleBlocks.length; x++){
-            if (/educationView/.test(possibleBlocks[x].innerHTML) && /languageView/.test(possibleBlocks[x].innerHTML)){
+            var currSchemaBlock = possibleBlocks[x];
+            if (/educationView/.test(currSchemaBlock.innerHTML) && /languageView/.test(currSchemaBlock.innerHTML)){
+                console.log(currSchemaBlock);
                 try {
-                    var embeddedJson = JSON.parse(possibleBlocks[x].innerHTML);
+                    var embeddedJson = JSON.parse(currSchemaBlock.innerHTML);
                     console.log(embeddedJson);
+                    var db = buildDbFromLiSchema(embeddedJson);
+
+                    // Parse education
+                    db.getValuesByKey(_liSchemaKeys.education).forEach(function(edu){
+                        var parsedEdu = {
+                            institution : edu.schoolName,
+                            area: noNull(edu.fieldOfStudy),
+                            studyType: edu.degreeName,
+                            startDate: edu.timePeriod.startDate.year + '-12-31',
+                            endDate: edu.timePeriod.endDate.year + '-12-31',
+                            gpa: noNull(edu.grade),
+                            courses : []
+                        }
+                        if (Array.isArray(edu.courses)){
+                            // Lookup course names
+                            edu.courses.forEach(function(courseKey){
+                                var courseInfo = db.data[courseKey];
+                                console.log(courseKey);
+                                if (courseInfo){
+                                    parsedEdu.courses.push(courseInfo.number + ' - ' + courseInfo.name);
+                                }
+                                else {
+                                    console.warn('could not find course:');
+                                    console.warn(courseKey);
+                                }
+                            });
+                        }
+                        // Push to final json
+                        _outputJson.education.push(parsedEdu);
+                    });
+
+                    // Parse work
+                    db.getValuesByKey(_liSchemaKeys.workPositions).forEach(function(position){
+                        var parsedWork = {
+                            //
+                        }
+
+                        // Push to final json
+                        _outputJson.work.push(parsedWork);
+                    });
+
+                    // @TODO
+                    console.log(_outputJson);
                 }
                 catch (e){
+                    console.warn(e);
                     console.log('Could not parse embedded schema!');
                 }
             }
         }
+    }
+    // This should be called every time
+    linkedinToResumeJson.prototype.parseBasics = function(){
+        _outputJson.basics.profiles.push({
+            "network" : "LinkedIn",
+            "username" : this.profileId,
+            "url" : "https://www.linkedin.com/in/" + this.profileId + "/"
+        });
     }
     linkedinToResumeJson.prototype.parseOldSchool = function(){
         //
@@ -137,8 +248,42 @@ var linkedinToResumeJson = (function(){
             // Get basic contact info
             var contactInfo = await this.voyagerFetch('/identity/profiles/{profileId}/profileContactInfo');
             console.log(contactInfo);
+            if (contactInfo && typeof(contactInfo.data)==='object'){
+                _outputJson.basics.location.address = contactInfo.data.address;
+                _outputJson.basics.email = contactInfo.data.emailAddress;
+                _outputJson.basics.phone = noNull(contactInfo.data.phoneNumbers);
+                if (Array.isArray(contactInfo.data.websites)){
+                    var websites = contactInfo.data.websites;
+                    for (var x=0; x<websites.length; x++){
+                        if (/portfolio/i.test(websites[x].type.category)){
+                            _outputJson.basics.website = websites[x].url;
+                        }
+                    }
+                }
+            }
+            var basicAboutMe = await this.voyagerFetch('/me');
+            console.log(basicAboutMe);
+            if (basicAboutMe && typeof(basicAboutMe.data)==='object'){
+                if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0){
+                    var data = basicAboutMe.included[0];
+                    _outputJson.basics.name = data.firstName + ' ' + data.LastName;
+                    // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
+                    _outputJson.basics.label = data.occupation;
+                    _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length-1].fileIdentifyingUrlPathSegment;
+                }
+            }
+            var advancedAboutMe = await this.voyagerFetch('/identity/profiles/{profileId}');
+            console.log(advancedAboutMe);
+            if (advancedAboutMe && typeof(advancedAboutMe.data)==='object'){
+                var data = advancedAboutMe.data;
+                _outputJson.basics.name = data.firstName + ' ' + data.lastName;
+                _outputJson.basics.label = data.headline;
+                _outputJson.basics.summary = data.summary;
+            }
+            console.log(_outputJson);
         }
         catch (e){
+            console.warn(e);
             console.log('Error parsing using internal API (Voyager)');
         }
     }
@@ -148,7 +293,8 @@ var linkedinToResumeJson = (function(){
     }
     linkedinToResumeJson.prototype.tryParse = function(){
         if (!this.parseSuccess){
-
+            this.parseBasics();
+            this.parseViaInternalApi();
         }
     }
     linkedinToResumeJson.prototype.getJSON = function(){
@@ -182,7 +328,6 @@ var linkedinToResumeJson = (function(){
         if (!endpoint.startsWith('https')){
             endpoint = 'https://www.linkedin.com/voyager/api' + endpoint;
         }
-        cb = typeof(cb)==='function' ? cb : function(r){console.log(r);};
         return new Promise(function(resolve,reject){
             // Get the csrf token - should be stored as a cookie
             var csrfTokenString = getCookie('JSESSIONID').replace(/"/g,'');

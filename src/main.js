@@ -222,13 +222,12 @@ var linkedinToResumeJson = (function(){
         return db;
     }
     // Constructor
-    function linkedinToResumeJson(OPT_exportBeyondSpec){
-        console.log("Constructed!");
-        this.pageScanned = false;
-        this.pageHasEmbeddedSchema = false;
+    function linkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug){
+        this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.profileId = this.getProfileId();
         this.exportBeyondSpec = (OPT_exportBeyondSpec || false);
+        this.debug = typeof(OPT_debug)==='boolean' ? OPT_debug : false;
     }
     linkedinToResumeJson.prototype.setExportBeyondSpec = function(setting){
         if (typeof(setting)==='boolean'){
@@ -239,14 +238,14 @@ var linkedinToResumeJson = (function(){
         let _this = this;
         let foundGithub = false;
         let foundPortfolio = false;
+        let doneWithBlockIterator = false;
         let possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
         for (let x=0; x<possibleBlocks.length; x++){
             let currSchemaBlock = possibleBlocks[x];
             if (/educationView/.test(currSchemaBlock.innerHTML) && /languageView/.test(currSchemaBlock.innerHTML)){
-                console.log(currSchemaBlock);
+                doneWithBlockIterator = true;
                 try {
                     let embeddedJson = JSON.parse(currSchemaBlock.innerHTML);
-                    console.log(embeddedJson);
                     let db = buildDbFromLiSchema(embeddedJson);
 
                     // Parse basics / profile
@@ -309,25 +308,34 @@ var linkedinToResumeJson = (function(){
                     // Parse education
                     db.getValuesByKey(_liSchemaKeys.education).forEach(function(edu){
                         let parsedEdu = {
-                            institution : edu.schoolName,
+                            institution : noNull(edu.schoolName),
                             area: noNull(edu.fieldOfStudy),
-                            studyType: edu.degreeName,
-                            startDate: edu.timePeriod.startDate.year + '-12-31',
-                            endDate: edu.timePeriod.endDate.year + '-12-31',
+                            studyType: noNull(edu.degreeName),
+                            startDate: '',
+                            endDate: '',
                             gpa: noNull(edu.grade),
                             courses : []
+                        }
+                        if (edu.timePeriod && typeof(edu.timePeriod)==='object'){
+                            if (edu.timePeriod.startDate && typeof(edu.timePeriod.startDate)==='object'){
+                                parsedEdu.startDate = edu.timePeriod.startDate.year + '-12-31';
+                            }
+                            if (edu.timePeriod.endDate && typeof(edu.timePeriod.endDate)==='object'){
+                                parsedEdu.endDate = edu.timePeriod.endDate.year + '-12-31';
+                            }
                         }
                         if (Array.isArray(edu.courses)){
                             // Lookup course names
                             edu.courses.forEach(function(courseKey){
                                 let courseInfo = db.data[courseKey];
-                                console.log(courseKey);
                                 if (courseInfo){
                                     parsedEdu.courses.push(courseInfo.number + ' - ' + courseInfo.name);
                                 }
                                 else {
-                                    console.warn('could not find course:');
-                                    console.warn(courseKey);
+                                    if (_this.debug){
+                                        console.warn('could not find course:');
+                                        console.warn(courseKey);
+                                    }
                                 }
                             });
                         }
@@ -346,11 +354,11 @@ var linkedinToResumeJson = (function(){
                             summary: position.description,
                             website: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
                         }
-                        if (typeof(position.timePeriod)==='object'){
-                            if (typeof(position.timePeriod.endDate)==='object'){
+                        if (position.timePeriod && typeof(position.timePeriod)==='object'){
+                            if (position.timePeriod.endDate && typeof(position.timePeriod.endDate)==='object'){
                                 parsedWork.endDate = position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31';
                             }
-                            if (typeof(position.timePeriod.startDate)==='object'){
+                            if (position.timePeriod.startDate && typeof(position.timePeriod.startDate)==='object'){
                                 parsedWork.startDate = position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31';
                             }
                         }
@@ -366,7 +374,6 @@ var linkedinToResumeJson = (function(){
 
                     // Parse volunteer experience
                     db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach(function(volunteering){
-                        debugger;
                         let parsedVolunteerWork = {
                             organization: volunteering.companyName,
                             position: volunteering.role,
@@ -376,11 +383,11 @@ var linkedinToResumeJson = (function(){
                             summary: volunteering.description,
                             highlights: []
                         }
-                        if (typeof(volunteering.timePeriod)==='object'){
-                            if (typeof(volunteering.timePeriod.endDate)==='object'){
+                        if (volunteering.timePeriod && typeof(volunteering.timePeriod)==='object'){
+                            if (typeof(volunteering.timePeriod.endDate)==='object' && volunteering.timePeriod.endDate!==null){
                                 parsedVolunteerWork.endDate = volunteering.timePeriod.endDate.year + '-' + volunteering.timePeriod.endDate.month + '-31';
                             }
-                            if (typeof(volunteering.timePeriod.startDate)==='object'){
+                            if (typeof(volunteering.timePeriod.startDate)==='object' && volunteering.timePeriod.startDate!==null){
                                 parsedVolunteerWork.startDate = volunteering.timePeriod.startDate.year + '-' + volunteering.timePeriod.startDate.month + '-31';
                             }
                         }
@@ -446,12 +453,16 @@ var linkedinToResumeJson = (function(){
                     if (this.exportBeyondSpec){
                         _outputJson.projects = (_outputJson.projects || []);
                         db.getValuesByKey(_liSchemaKeys.projects).forEach(function(project){
-                            _outputJson.projects.push({
+                            let parsedProject = {
                                 name: project.title,
-                                startDate: project.timePeriod.startDate + '-12-31',
+                                startDate: '',
                                 summary: project.description,
                                 url: project.url
-                            });
+                            };
+                            if (project.timePeriod && typeof(project.timePeriod)==='object'){
+                                parsedProject.startDate = project.timePeriod.startDate + '-12-31';
+                            }
+                            _outputJson.projects.push(parsedProject);
                         });
                     }
 
@@ -463,7 +474,7 @@ var linkedinToResumeJson = (function(){
                             awarder: award.issuer,
                             summary: noNull(award.description)
                         };
-                        if (typeof(award.issueDate)==='object'){
+                        if (award.issueDate && typeof(award.issueDate)==='object'){
                             parsedAward.date = award.issueDate.year + '-' + award.issueDate.month + '-31';
                         }
                         _outputJson.awards.push(parsedAward);
@@ -478,24 +489,33 @@ var linkedinToResumeJson = (function(){
                             website: noNull(publication.url),
                             summary: noNull(publication.description)
                         };
-                        if (typeof(publication.date)==='object'){
+                        if (typeof(publication.date)==='object' && typeof(publication.date.year)!=='undefined'){
                             parsedPublication.releaseDate = publication.date.year + '-' + publication.date.month + '-' + publication.date.day;
                         }
                         _outputJson.publications.push(parsedPublication);
                     });
-
-                    console.log(_outputJson);
+                    if (_this.debug){
+                        console.log(_outputJson);
+                    }
+                    _this.parseSuccess = true;
                 }
                 catch (e){
-                    throw(e);
+                    if (_this.debug){
+                        throw(e);
+                    }
                     console.warn(e);
                     console.log('Could not parse embedded schema!');
                 }
+            }
+            if (doneWithBlockIterator){
+                _this.parseSuccess = true;
+                break;
             }
         }
     }
     // This should be called every time
     linkedinToResumeJson.prototype.parseBasics = function(){
+        this.profileId = this.getProfileId();
         _outputJson.basics.profiles.push({
             "network" : "LinkedIn",
             "username" : this.profileId,
@@ -506,7 +526,6 @@ var linkedinToResumeJson = (function(){
         try {
             // Get basic contact info
             let contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-            console.log(contactInfo);
             if (contactInfo && typeof(contactInfo.data)==='object'){
                 _outputJson.basics.location.address = contactInfo.data.address;
                 _outputJson.basics.email = contactInfo.data.emailAddress;
@@ -521,7 +540,6 @@ var linkedinToResumeJson = (function(){
                 }
             }
             let basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
-            console.log(basicAboutMe);
             if (basicAboutMe && typeof(basicAboutMe.data)==='object'){
                 if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0){
                     let data = basicAboutMe.included[0];
@@ -532,14 +550,15 @@ var linkedinToResumeJson = (function(){
                 }
             }
             let advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
-            console.log(advancedAboutMe);
             if (advancedAboutMe && typeof(advancedAboutMe.data)==='object'){
                 let data = advancedAboutMe.data;
                 _outputJson.basics.name = data.firstName + ' ' + data.lastName;
                 _outputJson.basics.label = data.headline;
                 _outputJson.basics.summary = data.summary;
             }
-            console.log(_outputJson);
+            if (this.debug){
+                console.log(_outputJson);
+            }
         }
         catch (e){
             console.warn(e);
@@ -554,13 +573,13 @@ var linkedinToResumeJson = (function(){
             // Scroll to bottom
             function scrollToBottom(){
                 let maxHeight = document.body.scrollHeight;
-                window.scrollTo(x,maxHeight);
+                window.scrollTo(0,maxHeight);
             }
             scrollToBottom();
             await new Promise((resolve,reject)=>{
                 setTimeout(function(){
                     scrollToBottom();
-                    window.scrollTo(x,startingLocY);
+                    window.scrollTo(0,startingLocY);
                     _scrolledToLoad = true;
                     resolve();
                 },400);
@@ -570,16 +589,29 @@ var linkedinToResumeJson = (function(){
         return true;
     }
     linkedinToResumeJson.prototype.forceReParse = function(){
+        _scrolledToLoad = false;
         this.parseSuccess = false;
         this.tryParse();
     }
     linkedinToResumeJson.prototype.tryParse = function(){
-        this.triggerAjaxLoadByScrolling(function(){
-            if (!this.parseSuccess){
-                this.parseBasics();
-                this.parseEmbeddedLiSchema();
-            }
-        });
+        let _this = this;
+        if (this.parseSuccess && this.scannedPageUrl !== this.getUrlWithoutQuery()){
+            // Parse already done, but page changed (ajax)
+            this.forceReParse();
+            return false;
+        }
+        else {
+            this.triggerAjaxLoadByScrolling(function(){
+                if (!_this.parseSuccess){
+                    _this.parseBasics();
+                    _this.parseEmbeddedLiSchema();
+                    _this.scannedPageUrl = _this.getUrlWithoutQuery();
+                }
+            });
+        }
+    }
+    linkedinToResumeJson.prototype.getUrlWithoutQuery = function(){
+        return document.location.origin + document.location.pathname;
     }
     linkedinToResumeJson.prototype.getJSON = function(){
         if (this.parseSuccess){
@@ -639,7 +671,9 @@ var linkedinToResumeJson = (function(){
                     "method" : "GET",
                     "mode" : "cors"
                 };
-                console.log(fetchOptions);
+                if (this.debug){
+                    console.log(fetchOptions);
+                }
                 fetch(endpoint,fetchOptions).then(function(response){
                     if (response.status !== 200){
                         resolve(false);

@@ -70,12 +70,14 @@ var resumeJsonTemplate = {
         */
 	],
 	"awards": [
+        /*
 		{
 			"title" : "",
 			"date" : "",
 			"awarder" : "",
 			"summary" : ""
-		}
+        }
+        */
 	],
 	"publications": [
 		{
@@ -133,7 +135,8 @@ var linkedinToResumeJson = (function(){
         skills: '*skillView',
         projects: '*projectView',
         attachments: '*summaryTreasuryMedias',
-        volunteerWork: '*volunteerExperienceView'
+        volunteerWork: '*volunteerExperienceView',
+        awards: '*honorView'
     }
     let _voyagerEndpoints = {
         following : '/identity/profiles/{profileId}/following',
@@ -443,6 +446,20 @@ var linkedinToResumeJson = (function(){
                             });
                         });
                     }
+
+                    // Parse awards
+                    db.getValuesByKey(_liSchemaKeys.awards).forEach(function(award){
+                        let parsedAward = {
+                            title: award.title,
+                            date: '',
+                            awarder: award.issuer,
+                            summary: noNull(award.description)
+                        };
+                        if (typeof(award.issueDate)==='object'){
+                            parsedAward.date = award.issueDate.year + '-' + award.issueDate.month + '-31';
+                        }
+                        _outputJson.awards.push(parsedAward);
+                    });
 
                     // @TODO
                     console.log(_outputJson);

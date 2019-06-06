@@ -234,8 +234,11 @@ var LinkedinToResumeJson = (function(){
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.profileId = this.getProfileId();
-        this.exportBeyondSpec = (OPT_exportBeyondSpec || false);
+        this.exportBeyondSpec = typeof(OPT_exportBeyondSpec)==='boolean' ? OPT_exportBeyondSpec : false;
         this.debug = typeof(OPT_debug)==='boolean' ? OPT_debug : false;
+        if (this.debug){
+            console.warn('LinkedinToResumeJson - DEBUG mode is ON');
+        }
     }
     LinkedinToResumeJson.prototype.setExportBeyondSpec = function(setting){
         if (typeof(setting)==='boolean'){
@@ -250,7 +253,7 @@ var LinkedinToResumeJson = (function(){
         let possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
         for (let x=0; x<possibleBlocks.length; x++){
             let currSchemaBlock = possibleBlocks[x];
-            if (/educationView/.test(currSchemaBlock.innerHTML) && /languageView/.test(currSchemaBlock.innerHTML)){
+            if (/educationView/.test(currSchemaBlock.innerHTML) && /positionView/.test(currSchemaBlock.innerHTML)){
                 doneWithBlockIterator = true;
                 try {
                     let embeddedJson = JSON.parse(currSchemaBlock.innerHTML);
@@ -590,10 +593,13 @@ var LinkedinToResumeJson = (function(){
                     window.scrollTo(0,startingLocY);
                     _scrolledToLoad = true;
                     resolve();
+                    cb();
                 },400);
             });
         }
-        cb();
+        else {
+            cb();
+        }
         return true;
     }
     LinkedinToResumeJson.prototype.forceReParse = async function(){
@@ -611,11 +617,9 @@ var LinkedinToResumeJson = (function(){
             }
             else {
                 this.triggerAjaxLoadByScrolling(function(){
-                    if (!_this.parseSuccess){
-                        _this.parseBasics();
-                        _this.parseEmbeddedLiSchema();
-                        _this.scannedPageUrl = _this.getUrlWithoutQuery();
-                    }
+                    _this.parseBasics();
+                    _this.parseEmbeddedLiSchema();
+                    _this.scannedPageUrl = _this.getUrlWithoutQuery();
                     resolve(true);
                 });
             }
@@ -685,7 +689,7 @@ var LinkedinToResumeJson = (function(){
             `#${_toolPrefix}_modalWrapper {` +
                 `width: 100%;` +
                 `height: 100%;` +
-                `position: absolute;` +
+                `position: fixed;` +
                 `top: 0;` +
                 `left: 0;` +
                 `background-color: rgba(0, 0, 0, 0.8);` +
@@ -823,5 +827,5 @@ var LinkedinToResumeJson = (function(){
     return LinkedinToResumeJson;
 })();
 // Create instance and execute bookmarklet parser
-window.linkedinToResumeJsonConverter = new LinkedinToResumeJson();
+window.linkedinToResumeJsonConverter = new LinkedinToResumeJson(null,true);
 window.linkedinToResumeJsonConverter.parseAndShowOutput();

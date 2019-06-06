@@ -1,7 +1,10 @@
 # LinkedIn Profile to JSON Resume Bookmarklet
+![Demo GIF](demo.gif "Demo Gif")
 
 # Installation:
-[link]
+You can either build it yourself, or grab the bookmarklet off my project page, [here](https://joshuatz.com/projects/web-stuff/linkedin-profile-to-json-resume-exporter-bookmarklet).
+
+Note that because of LinkedIn's CORs/injection policies, I can't make an auto-updated version of this bookmarklet. If something breaks, you will have to come back here to grab an updated version (if I release it).
 
 ## What is JSON Resume?
 "JSON Resume" is an open-source standard / schema, currently gaining in adoption, that standardizes the content of a resume into a shared underlying structure that others can use in automated resume formatters, parsers, etc. Read more about it [here](https://jsonresume.org/), or on [GitHub](https://github.com/jsonresume).

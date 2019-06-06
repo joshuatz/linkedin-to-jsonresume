@@ -5,25 +5,42 @@
     "main": "src/main.js",
     "scripts": {
         "test": "\"Error: no test specified\" && exit 1",
-        "build": "babel src --out-dir build"
+        "babel": "babel src --out-dir build",
+        "webpack": "npx webpack --config webpack.config.js",
+        "build-bookmarklet": "npm run webpack && bookmarklet ./build/main.js ./build/bookmarklet_export.js",
+        "build": "npm run build-bookmarklet && node build.js"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",
-    "dependencies": {},
+    "dependencies": {
+        "@babel/runtime": "^7.4.5",
+        "babel-loader": "^8.0.6"
+    },
     "devDependencies": {
         "@babel/cli": "^7.4.4",
         "@babel/core": "^7.4.4",
+        "@babel/plugin-transform-runtime": "^7.4.4",
         "@babel/preset-env": "^7.4.4",
-        "bookmarklet": ""
+        "bookmarklet": "",
+        "fs": "0.0.1-security",
+        "replace": "^1.1.0",
+        "webpack": "^4.33.0",
+        "webpack-cli": "^3.3.2"
     },
     "babel": {
+        "plugins": [
+            "@babel/transform-runtime"
+        ],
         "presets": [
             [
                 "@babel/preset-env",
                 {
                     "targets": {
-                        "browsers" : "defaults"
-                    }
+                        "browsers": "defaults"
+                    },
+                    "include": [
+                        "transform-regenerator"
+                    ]
                 }
             ]
         ]

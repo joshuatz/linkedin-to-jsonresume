@@ -1,7 +1,7 @@
 /**
  * @author Joshua Tzucker
  * @license MIT
- * Warning: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
+ * WARNING: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
  */
 
 var resumeJsonTemplate = {
@@ -149,6 +149,8 @@ var linkedinToResumeJson = (function(){
         advancedAboutMe : '/identity/profiles/{profileId}'
     }
     let _scrolledToLoad = false;
+    let _toolPrefix = 'jtzLiToResumeJson';
+    let _stylesInjected = false;
     function getCookie(name) {
         let v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
         return v ? v[2] : null;
@@ -588,26 +590,140 @@ var linkedinToResumeJson = (function(){
         cb();
         return true;
     }
-    linkedinToResumeJson.prototype.forceReParse = function(){
+    linkedinToResumeJson.prototype.forceReParse = async function(){
         _scrolledToLoad = false;
         this.parseSuccess = false;
-        this.tryParse();
+        await this.tryParse();
     }
-    linkedinToResumeJson.prototype.tryParse = function(){
+    linkedinToResumeJson.prototype.tryParse = async function(){
         let _this = this;
-        if (this.parseSuccess && this.scannedPageUrl !== this.getUrlWithoutQuery()){
-            // Parse already done, but page changed (ajax)
-            this.forceReParse();
-            return false;
+        return new Promise(async (resolve,reject) => {
+            if (this.parseSuccess && this.scannedPageUrl !== this.getUrlWithoutQuery()){
+                // Parse already done, but page changed (ajax)
+                await this.forceReParse();
+                resolve(true);
+            }
+            else {
+                this.triggerAjaxLoadByScrolling(function(){
+                    if (!_this.parseSuccess){
+                        _this.parseBasics();
+                        _this.parseEmbeddedLiSchema();
+                        _this.scannedPageUrl = _this.getUrlWithoutQuery();
+                    }
+                    resolve(true);
+                });
+            }
+        });
+    }
+    linkedinToResumeJson.prototype.parseAndShowOutput = async function(){
+        await this.tryParse();
+        let parsedExport = {
+            raw: _outputJson,
+            stringified: JSON.stringify(_outputJson,null,2)
+        };
+        console.log(parsedExport);
+        this.showModal(parsedExport.raw);
+    }
+    linkedinToResumeJson.prototype.closeModal = function(){
+        let modalWrapperId = _toolPrefix + '_modalWrapper';
+        let modalWrapper = document.getElementById(modalWrapperId);
+        if (modalWrapper){
+            modalWrapper.style.display = 'none';
+        }
+    }
+    linkedinToResumeJson.prototype.showModal = function(jsonResume){
+        let _this = this;
+        // @TODO
+        let modalWrapperId = _toolPrefix + '_modalWrapper';
+        let modalWrapper = document.getElementById(modalWrapperId);
+        if (modalWrapper){
+            modalWrapper.style.display = 'block';
         }
         else {
-            this.triggerAjaxLoadByScrolling(function(){
-                if (!_this.parseSuccess){
-                    _this.parseBasics();
-                    _this.parseEmbeddedLiSchema();
-                    _this.scannedPageUrl = _this.getUrlWithoutQuery();
+            _this.injectStyles();
+            modalWrapper = document.createElement('div');
+            modalWrapper.id = modalWrapperId;
+            modalWrapper.innerHTML = ``
+            + `<div class="${_toolPrefix}_modal">`
+            +     `<div class="${_toolPrefix}_topBar">`
+            +         `<div class="${_toolPrefix}_titleText">Profile Export:</div>`
+            +         `<div class="${_toolPrefix}_closeButton">X</div>`
+            +     `</div>`
+            +     `<div class="${_toolPrefix}_modalBody">`
+            +         `<textarea id="${_toolPrefix}_exportTextField">Export will appear here...</textarea>`
+            +     `</div>`
+            + `</div>`;
+            document.body.appendChild(modalWrapper);
+            // Add event listeners
+            modalWrapper.addEventListener('click',function(evt){
+                // Check if click was on modal content, or wrapper (outside content, to trigger close)
+                if (evt.target.id === modalWrapperId){
+                    _this.closeModal();
                 }
             });
+            modalWrapper.querySelector('.' + _toolPrefix + '_closeButton').addEventListener('click',function(evt){
+                _this.closeModal();
+            });
+            var textarea = modalWrapper.querySelector('#' + _toolPrefix + '_exportTextField');
+            textarea.addEventListener('click',function(evt){
+                textarea.select();
+            });
+        }
+        // Actually set textarea text
+        modalWrapper.querySelector('#' + _toolPrefix + '_exportTextField').value = JSON.stringify(jsonResume,null,2);
+    }
+    linkedinToResumeJson.prototype.injectStyles = function(){
+        if (!_stylesInjected){
+            let styleElement = document.createElement('style');
+            styleElement.innerText = `` +
+            `#${_toolPrefix}_modalWrapper {` +
+                `width: 100%;` +
+                `height: 100%;` +
+                `position: absolute;` +
+                `top: 0;` +
+                `left: 0;` +
+                `background-color: rgba(0, 0, 0, 0.8);` +
+                `z-index: 99999999999999999999999999999999` +
+            `}` +
+            `.${_toolPrefix}_modal {` +
+                `width: 80%;` +
+                `margin-top: 10%;` +
+                `margin-left: 10%;` +
+                `background-color: white;` +
+                `padding: 20px;` +
+                `border-radius: 13px;` +
+            `}` +
+            `.${_toolPrefix}_topBar {` +
+                `width: 100%;` +
+                `position: relative;` +
+            `}` +
+            `.${_toolPrefix}_titleText {` +
+                `text-align: center;` +
+                `font-size: x-large;` +
+                `width: 100%;` +
+                `padding-top: 8px;` +
+            `}` +
+            `.${_toolPrefix}_closeButton {` +
+                `position: absolute;` +
+                `top: 0px;` +
+                `right: 0px;` +
+                `padding: 0px 8px;` +
+                `margin: 3px;` +
+                `border: 4px double black;` +
+                `border-radius: 10px;` +
+                `font-size: x-large;` +
+            `}` +
+            `.${_toolPrefix}_modalBody {` +
+                `width: 90%;` +
+                `margin-left: 5%;` +
+                `margin-top: 20px;` +
+                `padding-top: 8px;` +
+            `}` +
+            `#${_toolPrefix}_exportTextField {` +
+                `width: 100%;` +
+                `min-height: 300px;` +
+            `}`;
+            document.body.appendChild(styleElement);
         }
     }
     linkedinToResumeJson.prototype.getUrlWithoutQuery = function(){

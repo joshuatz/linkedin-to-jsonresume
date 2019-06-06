@@ -23,6 +23,7 @@ var resumeJsonTemplate = {
 		]
 	},
 	"work": [
+        /*
 		{
 			"company" : "",
 			"position" : "",
@@ -31,7 +32,8 @@ var resumeJsonTemplate = {
 			"endDate" : "",
 			"summary" : "",
 			"highlights": []
-		}
+        }
+        */
 	],
 	"volunteer": [
 		{
@@ -75,11 +77,13 @@ var resumeJsonTemplate = {
 		}
 	],
 	"skills": [
+        /*
 		{
 			"name" : "",
 			"level" : "",
 			"keywords": []
-		}
+        }
+        */
 	],
 	"languages": [
 		{
@@ -94,10 +98,12 @@ var resumeJsonTemplate = {
 		}
 	],
 	"references": [
+        /*
 		{
 			"name" : "",
 			"reference" : ""
-		}
+        }
+        */
 	]
 }
 
@@ -108,8 +114,18 @@ var linkedinToResumeJson = (function(){
     var _liSchemaKeys = {
         certificates : '*certificationView',
         education: '*educationView',
-        workPositions: '*positionGroupView'
+        workPositions: '*positionView',
+        skills: '*skillView',
+        projects: '*projectView'
     }
+    var _voyagerEndpoints = {
+        following : '/identity/profiles/{profileId}/following',
+        followingCompanies: '/identity/profiles/{profileId}/following?count=10&entityType=COMPANY&q=followedEntities',
+        contactInfo : '/identity/profiles/{profileId}/profileContactInfo',
+        basicAboutMe : '/me',
+        advancedAboutMe : '/identity/profiles/{profileId}'
+    }
+    var _scrolledToLoad = false;
     function getCookie(name) {
         var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
         return v ? v[2] : null;
@@ -165,12 +181,18 @@ var linkedinToResumeJson = (function(){
         return db;
     }
     // Constructor
-    function linkedinToResumeJson(){
+    function linkedinToResumeJson(OPT_exportBeyondSpec){
         console.log("Constructed!");
         this.pageScanned = false;
         this.pageHasEmbeddedSchema = false;
         this.parseSuccess = false;
         this.profileId = this.getProfileId();
+        this.exportBeyondSpec = (OPT_exportBeyondSpec || false);
+    }
+    linkedinToResumeJson.prototype.setExportBeyondSpec = function(setting){
+        if (typeof(setting)==='boolean'){
+            this.exportBeyondSpec = setting;
+        }
     }
     linkedinToResumeJson.prototype.parseEmbeddedLiSchema = function(){
         var possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
@@ -215,12 +237,89 @@ var linkedinToResumeJson = (function(){
                     // Parse work
                     db.getValuesByKey(_liSchemaKeys.workPositions).forEach(function(position){
                         var parsedWork = {
-                            //
+                            company: position.companyName,
+                            endDate: position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31',
+                            highlights: [],
+                            position: position.title,
+                            startDate: position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31',
+                            summary: position.description,
+                            website: ''
+                        }
+                        // Lookup company website
+                        if (position.company && position.company['*miniCompany']){
+                            var companyInfo = db.data[position.company['*miniCompany']];
+                            // @TODO - website is not in schema. Use voyager?
                         }
 
                         // Push to final json
                         _outputJson.work.push(parsedWork);
                     });
+
+                    // Parse certificates
+                    // Not currently used by JsonResume
+                    /*
+                    db.getValuesByKey(_liSchemaKeys.certificates).forEach(function(cert){
+                        //
+                    });
+                    */
+
+                    // Parse skills
+                    var skillArr = [];
+                    db.getValuesByKey(_liSchemaKeys.skills).forEach(function(skill){
+                        skillArr.push(skill.name);
+                    });
+                    document.querySelectorAll('span[class*="skill-category-entity"][class*="name"]').forEach(function(skillName){
+                        skillName = skillName.innerText;
+                        if (!skillArr.includes(skillName)){
+                            skillArr.push(skillName);
+                        }
+                    });
+                    skillArr.forEach(function(skillName){
+                        _outputJson.skills.push({
+                            name: skillName,
+                            level: '',
+                            keywords: []
+                        });
+                    });
+
+                    // Parse recommendations
+                    var recommendationHashes = [];
+                    document.querySelectorAll('#recommendation-list > li').forEach(function(elem){
+                        // Click the see more button
+                        // var clickMore = elem.querySelector('a[class*="__more"][href="#"]');
+                        // if (clickMore){
+                        //     clickMore.click();
+                        // }
+                        if (elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]')){
+                            var rawRefData = {
+                                name: elem.querySelector('h3').innerText,
+                                title: elem.querySelector('p[class*="headline"]').innerText,
+                                text: elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]').innerText
+                            }
+                            var hash = rawRefData.name + '|' + rawRefData.title;
+                            if (!recommendationHashes.includes(hash)){
+                                recommendationHashes.push(hash);
+                                _outputJson.references.push({
+                                    name: rawRefData.name,
+                                    reference: rawRefData.text
+                                });
+                            }
+                        }
+                    });
+
+                    // Parse projects
+                    // Not currently used by Resume JSON
+                    if (this.exportBeyondSpec){
+                        _outputJson.projects = (_outputJson.projects || []);
+                        db.getValuesByKey(_liSchemaKeys.projects).forEach(function(project){
+                            _outputJson.projects.push({
+                                name: project.title,
+                                startDate: project.timePeriod.startDate + '-12-31',
+                                summary: project.description,
+                                url: project.url
+                            });
+                        });
+                    }
 
                     // @TODO
                     console.log(_outputJson);
@@ -246,7 +345,7 @@ var linkedinToResumeJson = (function(){
     linkedinToResumeJson.prototype.parseViaInternalApi = async function(){
         try {
             // Get basic contact info
-            var contactInfo = await this.voyagerFetch('/identity/profiles/{profileId}/profileContactInfo');
+            var contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
             console.log(contactInfo);
             if (contactInfo && typeof(contactInfo.data)==='object'){
                 _outputJson.basics.location.address = contactInfo.data.address;
@@ -261,7 +360,7 @@ var linkedinToResumeJson = (function(){
                     }
                 }
             }
-            var basicAboutMe = await this.voyagerFetch('/me');
+            var basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
             console.log(basicAboutMe);
             if (basicAboutMe && typeof(basicAboutMe.data)==='object'){
                 if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0){
@@ -272,7 +371,7 @@ var linkedinToResumeJson = (function(){
                     _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length-1].fileIdentifyingUrlPathSegment;
                 }
             }
-            var advancedAboutMe = await this.voyagerFetch('/identity/profiles/{profileId}');
+            var advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
             console.log(advancedAboutMe);
             if (advancedAboutMe && typeof(advancedAboutMe.data)==='object'){
                 var data = advancedAboutMe.data;
@@ -287,15 +386,40 @@ var linkedinToResumeJson = (function(){
             console.log('Error parsing using internal API (Voyager)');
         }
     }
+    linkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function(cb){
+        cb = typeof(cb)==='function' ? cb : function(){};
+        if (!_scrolledToLoad){
+            // Capture current location
+            var startingLocY = window.scrollY;
+            // Scroll to bottom
+            function scrollToBottom(){
+                var maxHeight = document.body.scrollHeight;
+                window.scrollTo(x,maxHeight);
+            }
+            scrollToBottom();
+            await new Promise((resolve,reject)=>{
+                setTimeout(function(){
+                    scrollToBottom();
+                    window.scrollTo(x,startingLocY);
+                    _scrolledToLoad = true;
+                    resolve();
+                },400);
+            });
+        }
+        cb();
+        return true;
+    }
     linkedinToResumeJson.prototype.forceReParse = function(){
         this.parseSuccess = false;
         this.tryParse();
     }
     linkedinToResumeJson.prototype.tryParse = function(){
-        if (!this.parseSuccess){
-            this.parseBasics();
-            this.parseViaInternalApi();
-        }
+        this.triggerAjaxLoadByScrolling(function(){
+            if (!this.parseSuccess){
+                this.parseBasics();
+                this.parseViaInternalApi();
+            }
+        });
     }
     linkedinToResumeJson.prototype.getJSON = function(){
         if (this.parseSuccess){

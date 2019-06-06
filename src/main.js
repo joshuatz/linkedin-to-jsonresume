@@ -1,8 +1,14 @@
 /**
+ * @preserve
  * @author Joshua Tzucker
  * @license MIT
- * Warning: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
+ * WARNING: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
  */
+
+// ==Bookmarklet==
+// @name linkedin-to-jsonresume-bookmarklet
+// @author Joshua Tzucker
+// ==/Bookmarklet==
 
 var resumeJsonTemplate = {
 	"basics": {
@@ -125,7 +131,7 @@ var resumeJsonTemplate = {
 	]
 }
 
-var linkedinToResumeJson = (function(){
+var LinkedinToResumeJson = (function(){
     // private
     let _outputJson = resumeJsonTemplate;
     let _templateJson = resumeJsonTemplate;
@@ -149,6 +155,8 @@ var linkedinToResumeJson = (function(){
         advancedAboutMe : '/identity/profiles/{profileId}'
     }
     let _scrolledToLoad = false;
+    let _toolPrefix = 'jtzLiToResumeJson';
+    let _stylesInjected = false;
     function getCookie(name) {
         let v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
         return v ? v[2] : null;
@@ -222,19 +230,19 @@ var linkedinToResumeJson = (function(){
         return db;
     }
     // Constructor
-    function linkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug){
+    function LinkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug){
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.profileId = this.getProfileId();
         this.exportBeyondSpec = (OPT_exportBeyondSpec || false);
         this.debug = typeof(OPT_debug)==='boolean' ? OPT_debug : false;
     }
-    linkedinToResumeJson.prototype.setExportBeyondSpec = function(setting){
+    LinkedinToResumeJson.prototype.setExportBeyondSpec = function(setting){
         if (typeof(setting)==='boolean'){
             this.exportBeyondSpec = setting;
         }
     }
-    linkedinToResumeJson.prototype.parseEmbeddedLiSchema = function(){
+    LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = function(){
         let _this = this;
         let foundGithub = false;
         let foundPortfolio = false;
@@ -514,7 +522,7 @@ var linkedinToResumeJson = (function(){
         }
     }
     // This should be called every time
-    linkedinToResumeJson.prototype.parseBasics = function(){
+    LinkedinToResumeJson.prototype.parseBasics = function(){
         this.profileId = this.getProfileId();
         _outputJson.basics.profiles.push({
             "network" : "LinkedIn",
@@ -522,7 +530,7 @@ var linkedinToResumeJson = (function(){
             "url" : "https://www.linkedin.com/in/" + this.profileId + "/"
         });
     }
-    linkedinToResumeJson.prototype.parseViaInternalApi = async function(){
+    LinkedinToResumeJson.prototype.parseViaInternalApi = async function(){
         try {
             // Get basic contact info
             let contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
@@ -565,7 +573,7 @@ var linkedinToResumeJson = (function(){
             console.log('Error parsing using internal API (Voyager)');
         }
     }
-    linkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function(cb){
+    LinkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function(cb){
         cb = typeof(cb)==='function' ? cb : function(){};
         if (!_scrolledToLoad){
             // Capture current location
@@ -588,32 +596,146 @@ var linkedinToResumeJson = (function(){
         cb();
         return true;
     }
-    linkedinToResumeJson.prototype.forceReParse = function(){
+    LinkedinToResumeJson.prototype.forceReParse = async function(){
         _scrolledToLoad = false;
         this.parseSuccess = false;
-        this.tryParse();
+        await this.tryParse();
     }
-    linkedinToResumeJson.prototype.tryParse = function(){
+    LinkedinToResumeJson.prototype.tryParse = async function(){
         let _this = this;
-        if (this.parseSuccess && this.scannedPageUrl !== this.getUrlWithoutQuery()){
-            // Parse already done, but page changed (ajax)
-            this.forceReParse();
-            return false;
+        return new Promise(async (resolve,reject) => {
+            if (this.parseSuccess && this.scannedPageUrl !== this.getUrlWithoutQuery()){
+                // Parse already done, but page changed (ajax)
+                await this.forceReParse();
+                resolve(true);
+            }
+            else {
+                this.triggerAjaxLoadByScrolling(function(){
+                    if (!_this.parseSuccess){
+                        _this.parseBasics();
+                        _this.parseEmbeddedLiSchema();
+                        _this.scannedPageUrl = _this.getUrlWithoutQuery();
+                    }
+                    resolve(true);
+                });
+            }
+        });
+    }
+    LinkedinToResumeJson.prototype.parseAndShowOutput = async function(){
+        await this.tryParse();
+        let parsedExport = {
+            raw: _outputJson,
+            stringified: JSON.stringify(_outputJson,null,2)
+        };
+        console.log(parsedExport);
+        this.showModal(parsedExport.raw);
+    }
+    LinkedinToResumeJson.prototype.closeModal = function(){
+        let modalWrapperId = _toolPrefix + '_modalWrapper';
+        let modalWrapper = document.getElementById(modalWrapperId);
+        if (modalWrapper){
+            modalWrapper.style.display = 'none';
+        }
+    }
+    LinkedinToResumeJson.prototype.showModal = function(jsonResume){
+        let _this = this;
+        // @TODO
+        let modalWrapperId = _toolPrefix + '_modalWrapper';
+        let modalWrapper = document.getElementById(modalWrapperId);
+        if (modalWrapper){
+            modalWrapper.style.display = 'block';
         }
         else {
-            this.triggerAjaxLoadByScrolling(function(){
-                if (!_this.parseSuccess){
-                    _this.parseBasics();
-                    _this.parseEmbeddedLiSchema();
-                    _this.scannedPageUrl = _this.getUrlWithoutQuery();
+            _this.injectStyles();
+            modalWrapper = document.createElement('div');
+            modalWrapper.id = modalWrapperId;
+            modalWrapper.innerHTML = ``
+            + `<div class="${_toolPrefix}_modal">`
+            +     `<div class="${_toolPrefix}_topBar">`
+            +         `<div class="${_toolPrefix}_titleText">Profile Export:</div>`
+            +         `<div class="${_toolPrefix}_closeButton">X</div>`
+            +     `</div>`
+            +     `<div class="${_toolPrefix}_modalBody">`
+            +         `<textarea id="${_toolPrefix}_exportTextField">Export will appear here...</textarea>`
+            +     `</div>`
+            + `</div>`;
+            document.body.appendChild(modalWrapper);
+            // Add event listeners
+            modalWrapper.addEventListener('click',function(evt){
+                // Check if click was on modal content, or wrapper (outside content, to trigger close)
+                if (evt.target.id === modalWrapperId){
+                    _this.closeModal();
                 }
             });
+            modalWrapper.querySelector('.' + _toolPrefix + '_closeButton').addEventListener('click',function(evt){
+                _this.closeModal();
+            });
+            var textarea = modalWrapper.querySelector('#' + _toolPrefix + '_exportTextField');
+            textarea.addEventListener('click',function(evt){
+                textarea.select();
+            });
+        }
+        // Actually set textarea text
+        modalWrapper.querySelector('#' + _toolPrefix + '_exportTextField').value = JSON.stringify(jsonResume,null,2);
+    }
+    LinkedinToResumeJson.prototype.injectStyles = function(){
+        if (!_stylesInjected){
+            let styleElement = document.createElement('style');
+            styleElement.innerText = `` +
+            `#${_toolPrefix}_modalWrapper {` +
+                `width: 100%;` +
+                `height: 100%;` +
+                `position: absolute;` +
+                `top: 0;` +
+                `left: 0;` +
+                `background-color: rgba(0, 0, 0, 0.8);` +
+                `z-index: 99999999999999999999999999999999` +
+            `}` +
+            `.${_toolPrefix}_modal {` +
+                `width: 80%;` +
+                `margin-top: 10%;` +
+                `margin-left: 10%;` +
+                `background-color: white;` +
+                `padding: 20px;` +
+                `border-radius: 13px;` +
+            `}` +
+            `.${_toolPrefix}_topBar {` +
+                `width: 100%;` +
+                `position: relative;` +
+            `}` +
+            `.${_toolPrefix}_titleText {` +
+                `text-align: center;` +
+                `font-size: x-large;` +
+                `width: 100%;` +
+                `padding-top: 8px;` +
+            `}` +
+            `.${_toolPrefix}_closeButton {` +
+                `position: absolute;` +
+                `top: 0px;` +
+                `right: 0px;` +
+                `padding: 0px 8px;` +
+                `margin: 3px;` +
+                `border: 4px double black;` +
+                `border-radius: 10px;` +
+                `font-size: x-large;` +
+            `}` +
+            `.${_toolPrefix}_modalBody {` +
+                `width: 90%;` +
+                `margin-left: 5%;` +
+                `margin-top: 20px;` +
+                `padding-top: 8px;` +
+            `}` +
+            `#${_toolPrefix}_exportTextField {` +
+                `width: 100%;` +
+                `min-height: 300px;` +
+            `}`;
+            document.body.appendChild(styleElement);
         }
     }
-    linkedinToResumeJson.prototype.getUrlWithoutQuery = function(){
+    LinkedinToResumeJson.prototype.getUrlWithoutQuery = function(){
         return document.location.origin + document.location.pathname;
     }
-    linkedinToResumeJson.prototype.getJSON = function(){
+    LinkedinToResumeJson.prototype.getJSON = function(){
         if (this.parseSuccess){
             return _outputJson;
         }
@@ -624,7 +746,7 @@ var linkedinToResumeJson = (function(){
     /**
      * Get the profile ID / User ID of the user by parsing URL first, then page.
      */
-    linkedinToResumeJson.prototype.getProfileId = function(){
+    LinkedinToResumeJson.prototype.getProfileId = function(){
         let linkedProfileRegUrl = /linkedin.com\/[^\/]*\/([^\/]+)\/[^\/]*$/im;
         let linkedProfileRegApi = /voyager\/api\/.*\/profiles\/([^\/]+)\/.*/im
         if (linkedProfileRegUrl.test(document.location.href)){
@@ -635,7 +757,7 @@ var linkedinToResumeJson = (function(){
         }
         return false;
     }
-    linkedinToResumeJson.prototype.companyLiPageFromCompanyUrn = function(companyUrn){
+    LinkedinToResumeJson.prototype.companyLiPageFromCompanyUrn = function(companyUrn){
         let companyPageUrl = '';
         if (typeof(companyUrn)==='string'){
             let companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
@@ -648,7 +770,7 @@ var linkedinToResumeJson = (function(){
     /**
      * Special - Fetch with authenticated internal API
      */
-    linkedinToResumeJson.prototype.voyagerFetch = async function(endpoint){
+    LinkedinToResumeJson.prototype.voyagerFetch = async function(endpoint){
         // Macro support
         endpoint = endpoint.replace('{profileId}',this.profileId);
         if (!endpoint.startsWith('https')){
@@ -698,7 +820,8 @@ var linkedinToResumeJson = (function(){
             }
         });
     }
-    return linkedinToResumeJson;
+    return LinkedinToResumeJson;
 })();
-
-window.linkedinToResumeJsonConverter = new linkedinToResumeJson();
+// Create instance and execute bookmarklet parser
+window.linkedinToResumeJsonConverter = new LinkedinToResumeJson();
+window.linkedinToResumeJsonConverter.parseAndShowOutput();

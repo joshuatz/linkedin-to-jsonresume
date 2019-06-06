@@ -80,13 +80,15 @@ var resumeJsonTemplate = {
         */
 	],
 	"publications": [
+        /*
 		{
 			"name" : "",
 			"publisher" : "",
 			"releaseDate" : "",
 			"website" : "",
 			"summary" : ""
-		}
+        }
+        */
 	],
 	"skills": [
         /*
@@ -136,7 +138,8 @@ var linkedinToResumeJson = (function(){
         projects: '*projectView',
         attachments: '*summaryTreasuryMedias',
         volunteerWork: '*volunteerExperienceView',
-        awards: '*honorView'
+        awards: '*honorView',
+        publications: '*publicationView'
     }
     let _voyagerEndpoints = {
         following : '/identity/profiles/{profileId}/following',
@@ -152,7 +155,7 @@ var linkedinToResumeJson = (function(){
     }
     function noNull(value,OPT_defaultVal){
         let defaultVal = (OPT_defaultVal || '');
-        return value===null ? '' : defaultVal;
+        return value===null ? defaultVal : value;
     }
     function safeString(value){
         value = (value || '');
@@ -199,6 +202,10 @@ var linkedinToResumeJson = (function(){
                 // Needs secondary lookup if has elements property with list of keys pointing to other sub items
                 if (subToc['*elements'] && Array.isArray(subToc['*elements'])){
                     matchingDbIndexs = subToc['*elements'];
+                }
+                // Sometimes they use 'elements' instead of '*elements"...
+                else if (subToc['elements'] && Array.isArray(subToc['elements'])){
+                    matchingDbIndexs = subToc['elements'];
                 }
                 else {
                     // The object itself should be the return row
@@ -359,6 +366,7 @@ var linkedinToResumeJson = (function(){
 
                     // Parse volunteer experience
                     db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach(function(volunteering){
+                        debugger;
                         let parsedVolunteerWork = {
                             organization: volunteering.companyName,
                             position: volunteering.role,
@@ -461,7 +469,21 @@ var linkedinToResumeJson = (function(){
                         _outputJson.awards.push(parsedAward);
                     });
 
-                    // @TODO
+                    // Parse publications
+                    db.getValuesByKey(_liSchemaKeys.publications).forEach(function(publication){
+                        let parsedPublication = {
+                            name: publication.name,
+                            publisher: publication.publisher,
+                            releaseDate: '',
+                            website: noNull(publication.url),
+                            summary: noNull(publication.description)
+                        };
+                        if (typeof(publication.date)==='object'){
+                            parsedPublication.releaseDate = publication.date.year + '-' + publication.date.month + '-' + publication.date.day;
+                        }
+                        _outputJson.publications.push(parsedPublication);
+                    });
+
                     console.log(_outputJson);
                 }
                 catch (e){

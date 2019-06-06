@@ -44,6 +44,7 @@ var resumeJsonTemplate = {
         */
 	],
 	"volunteer": [
+        /*
 		{
 			"organization" : "",
 			"position" : "",
@@ -52,7 +53,8 @@ var resumeJsonTemplate = {
 			"endDate" : "",
 			"summary" : "",
 			"highlights": []
-		}
+        }
+        */
 	],
 	"education": [
         /*
@@ -130,7 +132,8 @@ var linkedinToResumeJson = (function(){
         workPositions: '*positionView',
         skills: '*skillView',
         projects: '*projectView',
-        attachments: '*summaryTreasuryMedias'
+        attachments: '*summaryTreasuryMedias',
+        volunteerWork: '*volunteerExperienceView'
     }
     let _voyagerEndpoints = {
         following : '/identity/profiles/{profileId}/following',
@@ -223,6 +226,7 @@ var linkedinToResumeJson = (function(){
         }
     }
     linkedinToResumeJson.prototype.parseEmbeddedLiSchema = function(){
+        let _this = this;
         let foundGithub = false;
         let foundPortfolio = false;
         let possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
@@ -325,12 +329,20 @@ var linkedinToResumeJson = (function(){
                     db.getValuesByKey(_liSchemaKeys.workPositions).forEach(function(position){
                         let parsedWork = {
                             company: position.companyName,
-                            endDate: position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31',
+                            endDate: '',
                             highlights: [],
                             position: position.title,
-                            startDate: position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31',
+                            startDate: '',
                             summary: position.description,
-                            website: ''
+                            website: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
+                        }
+                        if (typeof(position.timePeriod)==='object'){
+                            if (typeof(position.timePeriod.endDate)==='object'){
+                                parsedWork.endDate = position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31';
+                            }
+                            if (typeof(position.timePeriod.startDate)==='object'){
+                                parsedWork.startDate = position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31';
+                            }
                         }
                         // Lookup company website
                         if (position.company && position.company['*miniCompany']){
@@ -340,6 +352,30 @@ var linkedinToResumeJson = (function(){
 
                         // Push to final json
                         _outputJson.work.push(parsedWork);
+                    });
+
+                    // Parse volunteer experience
+                    db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach(function(volunteering){
+                        let parsedVolunteerWork = {
+                            organization: volunteering.companyName,
+                            position: volunteering.role,
+                            website: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                            startDate: '',
+                            endDate: '',
+                            summary: volunteering.description,
+                            highlights: []
+                        }
+                        if (typeof(volunteering.timePeriod)==='object'){
+                            if (typeof(volunteering.timePeriod.endDate)==='object'){
+                                parsedVolunteerWork.endDate = volunteering.timePeriod.endDate.year + '-' + volunteering.timePeriod.endDate.month + '-31';
+                            }
+                            if (typeof(volunteering.timePeriod.startDate)==='object'){
+                                parsedVolunteerWork.startDate = volunteering.timePeriod.startDate.year + '-' + volunteering.timePeriod.startDate.month + '-31';
+                            }
+                        }
+
+                        // Push to final json
+                        _outputJson.volunteer.push(parsedVolunteerWork);
                     });
 
                     // Parse certificates
@@ -412,7 +448,7 @@ var linkedinToResumeJson = (function(){
                     console.log(_outputJson);
                 }
                 catch (e){
-                    // throw(e);
+                    throw(e);
                     console.warn(e);
                     console.log('Could not parse embedded schema!');
                 }
@@ -527,6 +563,16 @@ var linkedinToResumeJson = (function(){
             return linkedProfileRegApi.exec(document.body.innerHTML)[1];
         }
         return false;
+    }
+    linkedinToResumeJson.prototype.companyLiPageFromCompanyUrn = function(companyUrn){
+        let companyPageUrl = '';
+        if (typeof(companyUrn)==='string'){
+            let companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
+            if (companyIdMatch){
+                companyPageUrl = 'https://www.linkedin.com/company/' + companyIdMatch[1];
+            }
+        }
+        return companyPageUrl;
     }
     /**
      * Special - Fetch with authenticated internal API

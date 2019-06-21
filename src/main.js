@@ -152,7 +152,8 @@ var LinkedinToResumeJson = (function(){
         followingCompanies: '/identity/profiles/{profileId}/following?count=10&entityType=COMPANY&q=followedEntities',
         contactInfo : '/identity/profiles/{profileId}/profileContactInfo',
         basicAboutMe : '/me',
-        advancedAboutMe : '/identity/profiles/{profileId}'
+        advancedAboutMe : '/identity/profiles/{profileId}',
+        fullProfileView : '/identity/profiles/{profileId}/profileView'
     }
     let _scrolledToLoad = false;
     let _toolPrefix = 'jtzLiToResumeJson';
@@ -229,6 +230,278 @@ var LinkedinToResumeJson = (function(){
         }
         return db;
     }
+    function parseProfileSchemaJSON(instance,json){
+        let profileParseSuccess = false;
+        let _this = instance;
+        let foundGithub = false;
+        let foundPortfolio = false;
+        try {
+            let db = buildDbFromLiSchema(json);
+            // Parse basics / profile
+            let profileGrabbed = false;
+            db.getValuesByKey(_liSchemaKeys.profile).forEach(function(profile){
+                // There should only be one
+                if (!profileGrabbed){
+                    profileGrabbed = true;
+                    _outputJson.basics.name = profile.firstName + ' ' + profile.lastName;
+                    _outputJson.basics.summary = noNull(profile.summary);
+                    _outputJson.basics.label = noNull(profile.headline);
+                    if(profile.address){
+                        _outputJson.basics.location.address = profile.address;
+                    }
+                    else if (profile.locationName) {
+                        _outputJson.basics.location.address = profile.locationName;
+                    }
+                    _outputJson.basics.location.countryCode = profile.defaultLocale.country;
+                    _outputJson.languages.push({
+                        language: profile.defaultLocale.language,
+                        fluency: 'Native Speaker'
+                    });
+                }
+            });
+
+            // Parse attachments / portfolio links
+            db.getValuesByKey(_liSchemaKeys.attachments).forEach(function(attachment){
+                let captured = false;
+                let url = attachment.data.url;
+                if ((attachment.providerName === 'GitHub' || /github\.com/gim.test(url))){
+                    let usernameMatch = /github\.com\/([^\/\?]+)[^\/]+$/gim.exec(url)
+                    if (usernameMatch && !foundGithub){
+                        foundGithub = true;
+                        captured = true;
+                        _outputJson.basics.profiles.push({
+                            network: 'GitHub',
+                            username: usernameMatch[1],
+                            url: url
+                        });
+                    }
+                }
+                // Since most people put potfolio as first link, guess that it will be
+                if (!captured && !foundPortfolio){
+                    captured = true;
+                    _outputJson.basics.website = url;
+                }
+                // Finally, put in projects if not yet categorized
+                if (!captured && _this.exportBeyondSpec){
+                    captured = true;
+                    _outputJson.projects = (_outputJson.projects || []);
+                    _outputJson.projects.push({
+                        name: attachment.title,
+                        startDate: '',
+                        summary: attachment.description,
+                        url: project.url
+                    });
+                }
+            });
+
+            // Parse education
+            db.getValuesByKey(_liSchemaKeys.education).forEach(function(edu){
+                let parsedEdu = {
+                    institution : noNull(edu.schoolName),
+                    area: noNull(edu.fieldOfStudy),
+                    studyType: noNull(edu.degreeName),
+                    startDate: '',
+                    endDate: '',
+                    gpa: noNull(edu.grade),
+                    courses : []
+                }
+                if (edu.timePeriod && typeof(edu.timePeriod)==='object'){
+                    if (edu.timePeriod.startDate && typeof(edu.timePeriod.startDate)==='object'){
+                        parsedEdu.startDate = edu.timePeriod.startDate.year + '-12-31';
+                    }
+                    if (edu.timePeriod.endDate && typeof(edu.timePeriod.endDate)==='object'){
+                        parsedEdu.endDate = edu.timePeriod.endDate.year + '-12-31';
+                    }
+                }
+                if (Array.isArray(edu.courses)){
+                    // Lookup course names
+                    edu.courses.forEach(function(courseKey){
+                        let courseInfo = db.data[courseKey];
+                        if (courseInfo){
+                            parsedEdu.courses.push(courseInfo.number + ' - ' + courseInfo.name);
+                        }
+                        else {
+                            if (_this.debug){
+                                console.warn('could not find course:');
+                                console.warn(courseKey);
+                            }
+                        }
+                    });
+                }
+                // Push to final json
+                _outputJson.education.push(parsedEdu);
+            });
+
+            // Parse work
+            db.getValuesByKey(_liSchemaKeys.workPositions).forEach(function(position){
+                let parsedWork = {
+                    company: position.companyName,
+                    endDate: '',
+                    highlights: [],
+                    position: position.title,
+                    startDate: '',
+                    summary: position.description,
+                    website: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
+                }
+                if (position.timePeriod && typeof(position.timePeriod)==='object'){
+                    if (position.timePeriod.endDate && typeof(position.timePeriod.endDate)==='object'){
+                        parsedWork.endDate = position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31';
+                    }
+                    if (position.timePeriod.startDate && typeof(position.timePeriod.startDate)==='object'){
+                        parsedWork.startDate = position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31';
+                    }
+                }
+                // Lookup company website
+                if (position.company && position.company['*miniCompany']){
+                    let companyInfo = db.data[position.company['*miniCompany']];
+                    // @TODO - website is not in schema. Use voyager?
+                }
+
+                // Push to final json
+                _outputJson.work.push(parsedWork);
+            });
+
+            // Parse volunteer experience
+            db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach(function(volunteering){
+                let parsedVolunteerWork = {
+                    organization: volunteering.companyName,
+                    position: volunteering.role,
+                    website: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                    startDate: '',
+                    endDate: '',
+                    summary: volunteering.description,
+                    highlights: []
+                }
+                if (volunteering.timePeriod && typeof(volunteering.timePeriod)==='object'){
+                    if (typeof(volunteering.timePeriod.endDate)==='object' && volunteering.timePeriod.endDate!==null){
+                        parsedVolunteerWork.endDate = volunteering.timePeriod.endDate.year + '-' + volunteering.timePeriod.endDate.month + '-31';
+                    }
+                    if (typeof(volunteering.timePeriod.startDate)==='object' && volunteering.timePeriod.startDate!==null){
+                        parsedVolunteerWork.startDate = volunteering.timePeriod.startDate.year + '-' + volunteering.timePeriod.startDate.month + '-31';
+                    }
+                }
+
+                // Push to final json
+                _outputJson.volunteer.push(parsedVolunteerWork);
+            });
+
+            // Parse certificates
+            // Not currently used by JsonResume
+            /*
+            db.getValuesByKey(_liSchemaKeys.certificates).forEach(function(cert){
+                //
+            });
+            */
+
+            // Parse skills
+            let skillArr = [];
+            db.getValuesByKey(_liSchemaKeys.skills).forEach(function(skill){
+                skillArr.push(skill.name);
+            });
+            document.querySelectorAll('span[class*="skill-category-entity"][class*="name"]').forEach(function(skillName){
+                skillName = skillName.innerText;
+                if (!skillArr.includes(skillName)){
+                    skillArr.push(skillName);
+                }
+            });
+            skillArr.forEach(function(skillName){
+                _outputJson.skills.push({
+                    name: skillName,
+                    level: '',
+                    keywords: []
+                });
+            });
+
+            // Parse recommendations
+            let recommendationHashes = [];
+            document.querySelectorAll('#recommendation-list > li').forEach(function(elem){
+                // Click the see more button
+                // let clickMore = elem.querySelector('a[class*="__more"][href="#"]');
+                // if (clickMore){
+                //     clickMore.click();
+                // }
+                if (elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]')){
+                    let rawRefData = {
+                        name: elem.querySelector('h3').innerText,
+                        title: elem.querySelector('p[class*="headline"]').innerText,
+                        text: elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]').innerText
+                    }
+                    let hash = rawRefData.name + '|' + rawRefData.title;
+                    if (!recommendationHashes.includes(hash)){
+                        recommendationHashes.push(hash);
+                        _outputJson.references.push({
+                            name: rawRefData.name,
+                            reference: rawRefData.text
+                        });
+                    }
+                }
+            });
+
+            // Parse projects
+            // Not currently used by Resume JSON
+            if (_this.exportBeyondSpec){
+                _outputJson.projects = (_outputJson.projects || []);
+                db.getValuesByKey(_liSchemaKeys.projects).forEach(function(project){
+                    let parsedProject = {
+                        name: project.title,
+                        startDate: '',
+                        summary: project.description,
+                        url: project.url
+                    };
+                    if (project.timePeriod && typeof(project.timePeriod)==='object'){
+                        parsedProject.startDate = project.timePeriod.startDate + '-12-31';
+                    }
+                    _outputJson.projects.push(parsedProject);
+                });
+            }
+
+            // Parse awards
+            db.getValuesByKey(_liSchemaKeys.awards).forEach(function(award){
+                let parsedAward = {
+                    title: award.title,
+                    date: '',
+                    awarder: award.issuer,
+                    summary: noNull(award.description)
+                };
+                if (award.issueDate && typeof(award.issueDate)==='object'){
+                    parsedAward.date = award.issueDate.year + '-' + award.issueDate.month + '-31';
+                }
+                _outputJson.awards.push(parsedAward);
+            });
+
+            // Parse publications
+            db.getValuesByKey(_liSchemaKeys.publications).forEach(function(publication){
+                let parsedPublication = {
+                    name: publication.name,
+                    publisher: publication.publisher,
+                    releaseDate: '',
+                    website: noNull(publication.url),
+                    summary: noNull(publication.description)
+                };
+                if (typeof(publication.date)==='object' && typeof(publication.date.year)!=='undefined'){
+                    parsedPublication.releaseDate = publication.date.year + '-' + publication.date.month + '-' + publication.date.day;
+                }
+                _outputJson.publications.push(parsedPublication);
+            });
+            if (_this.debug){
+                console.log(_outputJson);
+            }
+            _this.parseSuccess = true;
+            profileParseSuccess = true;
+        }
+        catch (e){
+            if (_this.debug){
+                console.error('Error parsing profile schema');
+                console.group('Error parsing profile schema');
+                    console.log(e);
+                    console.log('Instance');
+                    console.log(_this);
+                console.groupEnd();
+            }
+            profileParseSuccess = false;
+        }
+        return profileParseSuccess;
+    }
     // Constructor
     function LinkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug){
         this.scannedPageUrl = '';
@@ -247,268 +520,20 @@ var LinkedinToResumeJson = (function(){
     }
     LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = function(){
         let _this = this;
-        let foundGithub = false;
-        let foundPortfolio = false;
         let doneWithBlockIterator = false;
+        let foundSomeSchema = false;
         let possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
         for (let x=0; x<possibleBlocks.length; x++){
             let currSchemaBlock = possibleBlocks[x];
             if (/educationView/.test(currSchemaBlock.innerHTML) && /positionView/.test(currSchemaBlock.innerHTML)){
                 doneWithBlockIterator = true;
+                foundSomeSchema = true;
                 try {
                     let embeddedJson = JSON.parse(currSchemaBlock.innerHTML);
-                    let db = buildDbFromLiSchema(embeddedJson);
-
-                    // Parse basics / profile
-                    let profileGrabbed = false;
-                    db.getValuesByKey(_liSchemaKeys.profile).forEach(function(profile){
-                        // There should only be one
-                        if (!profileGrabbed){
-                            profileGrabbed = true;
-                            _outputJson.basics.name = profile.firstName + ' ' + profile.lastName;
-                            _outputJson.basics.summary = noNull(profile.summary);
-                            _outputJson.basics.label = noNull(profile.headline);
-                            if(profile.address){
-                                _outputJson.basics.location.address = profile.address;
-                            }
-                            else if (profile.locationName) {
-                                _outputJson.basics.location.address = profile.locationName;
-                            }
-                            _outputJson.basics.location.countryCode = profile.defaultLocale.country;
-                            _outputJson.languages.push({
-                                language: profile.defaultLocale.language,
-                                fluency: 'Native Speaker'
-                            });
-                        }
-                    });
-
-                    // Parse attachments / portfolio links
-                    db.getValuesByKey(_liSchemaKeys.attachments).forEach(function(attachment){
-                        let captured = false;
-                        let url = attachment.data.url;
-                        if ((attachment.providerName === 'GitHub' || /github\.com/gim.test(url))){
-                            let usernameMatch = /github\.com\/([^\/\?]+)[^\/]+$/gim.exec(url)
-                            if (usernameMatch && !foundGithub){
-                                foundGithub = true;
-                                captured = true;
-                                _outputJson.basics.profiles.push({
-                                    network: 'GitHub',
-                                    username: usernameMatch[1],
-                                    url: url
-                                });
-                            }
-                        }
-                        // Since most people put potfolio as first link, guess that it will be
-                        if (!captured && !foundPortfolio){
-                            captured = true;
-                            _outputJson.basics.website = url;
-                        }
-                        // Finally, put in projects if not yet categorized
-                        if (!captured && this.exportBeyondSpec){
-                            captured = true;
-                            _outputJson.projects = (_outputJson.projects || []);
-                            _outputJson.projects.push({
-                                name: attachment.title,
-                                startDate: '',
-                                summary: attachment.description,
-                                url: project.url
-                            });
-                        }
-                    });
-
-                    // Parse education
-                    db.getValuesByKey(_liSchemaKeys.education).forEach(function(edu){
-                        let parsedEdu = {
-                            institution : noNull(edu.schoolName),
-                            area: noNull(edu.fieldOfStudy),
-                            studyType: noNull(edu.degreeName),
-                            startDate: '',
-                            endDate: '',
-                            gpa: noNull(edu.grade),
-                            courses : []
-                        }
-                        if (edu.timePeriod && typeof(edu.timePeriod)==='object'){
-                            if (edu.timePeriod.startDate && typeof(edu.timePeriod.startDate)==='object'){
-                                parsedEdu.startDate = edu.timePeriod.startDate.year + '-12-31';
-                            }
-                            if (edu.timePeriod.endDate && typeof(edu.timePeriod.endDate)==='object'){
-                                parsedEdu.endDate = edu.timePeriod.endDate.year + '-12-31';
-                            }
-                        }
-                        if (Array.isArray(edu.courses)){
-                            // Lookup course names
-                            edu.courses.forEach(function(courseKey){
-                                let courseInfo = db.data[courseKey];
-                                if (courseInfo){
-                                    parsedEdu.courses.push(courseInfo.number + ' - ' + courseInfo.name);
-                                }
-                                else {
-                                    if (_this.debug){
-                                        console.warn('could not find course:');
-                                        console.warn(courseKey);
-                                    }
-                                }
-                            });
-                        }
-                        // Push to final json
-                        _outputJson.education.push(parsedEdu);
-                    });
-
-                    // Parse work
-                    db.getValuesByKey(_liSchemaKeys.workPositions).forEach(function(position){
-                        let parsedWork = {
-                            company: position.companyName,
-                            endDate: '',
-                            highlights: [],
-                            position: position.title,
-                            startDate: '',
-                            summary: position.description,
-                            website: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
-                        }
-                        if (position.timePeriod && typeof(position.timePeriod)==='object'){
-                            if (position.timePeriod.endDate && typeof(position.timePeriod.endDate)==='object'){
-                                parsedWork.endDate = position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31';
-                            }
-                            if (position.timePeriod.startDate && typeof(position.timePeriod.startDate)==='object'){
-                                parsedWork.startDate = position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31';
-                            }
-                        }
-                        // Lookup company website
-                        if (position.company && position.company['*miniCompany']){
-                            let companyInfo = db.data[position.company['*miniCompany']];
-                            // @TODO - website is not in schema. Use voyager?
-                        }
-
-                        // Push to final json
-                        _outputJson.work.push(parsedWork);
-                    });
-
-                    // Parse volunteer experience
-                    db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach(function(volunteering){
-                        let parsedVolunteerWork = {
-                            organization: volunteering.companyName,
-                            position: volunteering.role,
-                            website: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
-                            startDate: '',
-                            endDate: '',
-                            summary: volunteering.description,
-                            highlights: []
-                        }
-                        if (volunteering.timePeriod && typeof(volunteering.timePeriod)==='object'){
-                            if (typeof(volunteering.timePeriod.endDate)==='object' && volunteering.timePeriod.endDate!==null){
-                                parsedVolunteerWork.endDate = volunteering.timePeriod.endDate.year + '-' + volunteering.timePeriod.endDate.month + '-31';
-                            }
-                            if (typeof(volunteering.timePeriod.startDate)==='object' && volunteering.timePeriod.startDate!==null){
-                                parsedVolunteerWork.startDate = volunteering.timePeriod.startDate.year + '-' + volunteering.timePeriod.startDate.month + '-31';
-                            }
-                        }
-
-                        // Push to final json
-                        _outputJson.volunteer.push(parsedVolunteerWork);
-                    });
-
-                    // Parse certificates
-                    // Not currently used by JsonResume
-                    /*
-                    db.getValuesByKey(_liSchemaKeys.certificates).forEach(function(cert){
-                        //
-                    });
-                    */
-
-                    // Parse skills
-                    let skillArr = [];
-                    db.getValuesByKey(_liSchemaKeys.skills).forEach(function(skill){
-                        skillArr.push(skill.name);
-                    });
-                    document.querySelectorAll('span[class*="skill-category-entity"][class*="name"]').forEach(function(skillName){
-                        skillName = skillName.innerText;
-                        if (!skillArr.includes(skillName)){
-                            skillArr.push(skillName);
-                        }
-                    });
-                    skillArr.forEach(function(skillName){
-                        _outputJson.skills.push({
-                            name: skillName,
-                            level: '',
-                            keywords: []
-                        });
-                    });
-
-                    // Parse recommendations
-                    let recommendationHashes = [];
-                    document.querySelectorAll('#recommendation-list > li').forEach(function(elem){
-                        // Click the see more button
-                        // let clickMore = elem.querySelector('a[class*="__more"][href="#"]');
-                        // if (clickMore){
-                        //     clickMore.click();
-                        // }
-                        if (elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]')){
-                            let rawRefData = {
-                                name: elem.querySelector('h3').innerText,
-                                title: elem.querySelector('p[class*="headline"]').innerText,
-                                text: elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]').innerText
-                            }
-                            let hash = rawRefData.name + '|' + rawRefData.title;
-                            if (!recommendationHashes.includes(hash)){
-                                recommendationHashes.push(hash);
-                                _outputJson.references.push({
-                                    name: rawRefData.name,
-                                    reference: rawRefData.text
-                                });
-                            }
-                        }
-                    });
-
-                    // Parse projects
-                    // Not currently used by Resume JSON
-                    if (this.exportBeyondSpec){
-                        _outputJson.projects = (_outputJson.projects || []);
-                        db.getValuesByKey(_liSchemaKeys.projects).forEach(function(project){
-                            let parsedProject = {
-                                name: project.title,
-                                startDate: '',
-                                summary: project.description,
-                                url: project.url
-                            };
-                            if (project.timePeriod && typeof(project.timePeriod)==='object'){
-                                parsedProject.startDate = project.timePeriod.startDate + '-12-31';
-                            }
-                            _outputJson.projects.push(parsedProject);
-                        });
-                    }
-
-                    // Parse awards
-                    db.getValuesByKey(_liSchemaKeys.awards).forEach(function(award){
-                        let parsedAward = {
-                            title: award.title,
-                            date: '',
-                            awarder: award.issuer,
-                            summary: noNull(award.description)
-                        };
-                        if (award.issueDate && typeof(award.issueDate)==='object'){
-                            parsedAward.date = award.issueDate.year + '-' + award.issueDate.month + '-31';
-                        }
-                        _outputJson.awards.push(parsedAward);
-                    });
-
-                    // Parse publications
-                    db.getValuesByKey(_liSchemaKeys.publications).forEach(function(publication){
-                        let parsedPublication = {
-                            name: publication.name,
-                            publisher: publication.publisher,
-                            releaseDate: '',
-                            website: noNull(publication.url),
-                            summary: noNull(publication.description)
-                        };
-                        if (typeof(publication.date)==='object' && typeof(publication.date.year)!=='undefined'){
-                            parsedPublication.releaseDate = publication.date.year + '-' + publication.date.month + '-' + publication.date.day;
-                        }
-                        _outputJson.publications.push(parsedPublication);
-                    });
+                    let profileParserResult = parseProfileSchemaJSON(_this,embeddedJson);
                     if (_this.debug){
-                        console.log(_outputJson);
+                        console.log('Parse from embedded schema, success = ' + profileParserResult);
                     }
-                    _this.parseSuccess = true;
                 }
                 catch (e){
                     if (_this.debug){
@@ -523,6 +548,9 @@ var LinkedinToResumeJson = (function(){
                 break;
             }
         }
+        if (!foundSomeSchema && this.debug){
+            console.warn('Failed to find any embedded schema blocks!');
+        }
     }
     // This should be called every time
     LinkedinToResumeJson.prototype.parseBasics = function(){
@@ -535,40 +563,74 @@ var LinkedinToResumeJson = (function(){
     }
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function(){
         try {
-            // Get basic contact info
-            let contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-            if (contactInfo && typeof(contactInfo.data)==='object'){
-                _outputJson.basics.location.address = contactInfo.data.address;
-                _outputJson.basics.email = contactInfo.data.emailAddress;
-                _outputJson.basics.phone = noNull(contactInfo.data.phoneNumbers);
-                if (Array.isArray(contactInfo.data.websites)){
-                    let websites = contactInfo.data.websites;
-                    for (let x=0; x<websites.length; x++){
-                        if (/portfolio/i.test(websites[x].type.category)){
-                            _outputJson.basics.website = websites[x].url;
+            let apiSuccessCount = 0;
+            let fullProfileEndpointSuccess = false;
+
+            // Get full profile
+            let fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+            if (fullProfileView && typeof(fullProfileView.data)==='object'){
+                // Try to use the same parser that I use for embedded
+                let profileParserResult = parseProfileSchemaJSON(this,fullProfileView);
+                if (profileParserResult){
+                    apiSuccessCount++;
+                    fullProfileEndpointSuccess = true;
+                }
+                if (this.debug){
+                    console.log(_outputJson);
+                }
+            }
+
+            // Only continue with other endpoints if full profile API failed
+            if (!fullProfileEndpointSuccess){
+                // Get basic contact info
+                let contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
+                if (contactInfo && typeof(contactInfo.data)==='object'){
+                    _outputJson.basics.location.address = contactInfo.data.address;
+                    _outputJson.basics.email = contactInfo.data.emailAddress;
+                    _outputJson.basics.phone = noNull(contactInfo.data.phoneNumbers);
+                    if (Array.isArray(contactInfo.data.websites)){
+                        let websites = contactInfo.data.websites;
+                        for (let x=0; x<websites.length; x++){
+                            if (/portfolio/i.test(websites[x].type.category)){
+                                _outputJson.basics.website = websites[x].url;
+                            }
                         }
                     }
+                    apiSuccessCount++;
+                }
+
+                let basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
+                if (basicAboutMe && typeof(basicAboutMe.data)==='object'){
+                    if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0){
+                        let data = basicAboutMe.included[0];
+                        _outputJson.basics.name = data.firstName + ' ' + data.LastName;
+                        // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
+                        _outputJson.basics.label = data.occupation;
+                        _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length-1].fileIdentifyingUrlPathSegment;
+                    }
+                    apiSuccessCount++;
+                }
+
+                let advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
+                if (advancedAboutMe && typeof(advancedAboutMe.data)==='object'){
+                    let data = advancedAboutMe.data;
+                    _outputJson.basics.name = data.firstName + ' ' + data.lastName;
+                    _outputJson.basics.label = data.headline;
+                    _outputJson.basics.summary = data.summary;
+                    apiSuccessCount++;
                 }
             }
-            let basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
-            if (basicAboutMe && typeof(basicAboutMe.data)==='object'){
-                if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0){
-                    let data = basicAboutMe.included[0];
-                    _outputJson.basics.name = data.firstName + ' ' + data.LastName;
-                    // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
-                    _outputJson.basics.label = data.occupation;
-                    _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length-1].fileIdentifyingUrlPathSegment;
-                }
-            }
-            let advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
-            if (advancedAboutMe && typeof(advancedAboutMe.data)==='object'){
-                let data = advancedAboutMe.data;
-                _outputJson.basics.name = data.firstName + ' ' + data.lastName;
-                _outputJson.basics.label = data.headline;
-                _outputJson.basics.summary = data.summary;
-            }
+
             if (this.debug){
                 console.log(_outputJson);
+            }
+            if (apiSuccessCount > 0){
+                this.parseSuccess = true;
+            }
+            else {
+                if (this.debug){
+                    console.error('Using internal API (Voyager) failed completely!');
+                }
             }
         }
         catch (e){
@@ -619,6 +681,9 @@ var LinkedinToResumeJson = (function(){
                 this.triggerAjaxLoadByScrolling(function(){
                     _this.parseBasics();
                     _this.parseEmbeddedLiSchema();
+                    if (!_this.parseSuccess){
+                        _this.parseViaInternalApi();
+                    }
                     _this.scannedPageUrl = _this.getUrlWithoutQuery();
                     resolve(true);
                 });

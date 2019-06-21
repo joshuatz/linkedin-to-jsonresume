@@ -1,6 +1,10 @@
 # LinkedIn Profile to JSON Resume Bookmarklet
 ![Demo GIF](demo.gif "Demo Gif")
 
+# Updates:
+### 6/21/2019:
+> I saw the bookmarklet was broken depending on how you came to the profile page, so I refactored a bunch of code and found a much better way to pull the data. Should be much more reliable!
+
 # Installation:
 You can either build it yourself, or grab the bookmarklet off my project page, [here](https://joshuatz.com/projects/web-stuff/linkedin-profile-to-json-resume-exporter-bookmarklet).
 

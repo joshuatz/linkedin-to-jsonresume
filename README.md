@@ -1,7 +1,13 @@
 # LinkedIn Profile to JSON Resume Bookmarklet
+
+## Breaking issue - see [this](https://github.com/joshuatz/linkedin-to-jsonresume-bookmarklet/issues/1) for details.
+
 ![Demo GIF](demo.gif "Demo Gif")
 
 # Updates:
+### 7/22/2019:
+> ***ALERT***: This bookmarklet is currently broken, thanks to LinkedIn adding a new restrictive CSP (Content Security Policy) header to the site. [I've opened an issue](https://github.com/joshuatz/linkedin-to-jsonresume-bookmarklet/issues/1) to discuss this, and both short-term (requires using the console) and long-term (browser extension) solutions.
+
 ### 6/21/2019:
 > I saw the bookmarklet was broken depending on how you came to the profile page, so I refactored a bunch of code and found a much better way to pull the data. Should be much more reliable!
 

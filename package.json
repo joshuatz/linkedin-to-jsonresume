@@ -7,8 +7,8 @@
         "test": "\"Error: no test specified\" && exit 1",
         "babel": "babel src --out-dir build",
         "webpack": "npx webpack --config webpack.config.js",
-        "build-bookmarklet": "npm run webpack && bookmarklet ./build/main.js ./build/bookmarklet_export.js",
-        "build": "npm run build-bookmarklet && node build.js"
+        "prep-dirs": "prep-dirs.js",
+        "build-bookmarklet": "node prep-dirs.js && npm run webpack && bookmarklet ./build/main.js ./build-bookmarklet/bookmarklet_export.js && node build-bookmarklet.js"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",

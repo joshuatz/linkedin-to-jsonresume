@@ -3,7 +3,7 @@ var replace = require('replace');
 var fs = require('fs');
 
 // Paths
-var buildFolder = './build/';
+var buildFolder = './build-bookmarklet/';
 var installFileHtml = buildFolder + 'install-page.html';
 var srcFolder = './src/';
 
@@ -11,7 +11,7 @@ var srcFolder = './src/';
 var bookmarkletContent = fs.readFileSync(buildFolder + 'bookmarklet_export.js');
 
 // Copy template install page to build folder
-fs.copyFileSync(srcFolder + 'install-page-template.html',installFileHtml);
+fs.copyFileSync('./bookmarklet-resources/install-page-template.html',installFileHtml);
 
 // Replace placeholder variable in install HTML file with raw contents
 replace({

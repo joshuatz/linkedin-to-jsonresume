@@ -1,0 +1,6 @@
+{
+    "name": "LinkedIn JSON Resume Export",
+    "version": "0.0.1",
+    "description": "Export a LinkedIn profile to JSON Resume",
+    "manifest_version": 2
+}

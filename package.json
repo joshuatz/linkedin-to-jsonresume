@@ -8,7 +8,7 @@
         "babel": "babel src --out-dir build",
         "webpack": "npx webpack --config webpack.config.js",
         "prep-dirs": "prep-dirs.js",
-        "build-bookmarklet": "node prep-dirs.js && npm run webpack && bookmarklet ./build/main.js ./build-bookmarklet/bookmarklet_export.js && node build-bookmarklet.js"
+        "build-bookmarklet": "node prep-dirs.js && npm run webpack && node build-bookmarklet.js"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",

@@ -799,6 +799,3 @@ var LinkedinToResumeJson = (function(){
     }
     return LinkedinToResumeJson;
 })();
-// Create instance and execute bookmarklet parser
-window.linkedinToResumeJsonConverter = new LinkedinToResumeJson(null,true);
-window.linkedinToResumeJsonConverter.parseAndShowOutput();

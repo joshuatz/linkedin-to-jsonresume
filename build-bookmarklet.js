@@ -1,11 +1,19 @@
 // Dependencies
-var replace = require('replace');
-var fs = require('fs');
+const replace = require('replace');
+const fs = require('fs');
+const childProc = require('child_process');
 
 // Paths
-var buildFolder = './build-bookmarklet/';
-var installFileHtml = buildFolder + 'install-page.html';
-var srcFolder = './src/';
+const buildFolder = './build-bookmarklet/';
+const installFileHtml = buildFolder + 'install-page.html';
+const srcFolder = './src/';
+
+// Copy src to build and then append some JS that will auto-execute when ran
+fs.copyFileSync(srcFolder + 'main.js', buildFolder + 'main.js');
+fs.appendFileSync(buildFolder + 'main.js','window.linkedinToResumeJsonConverter = new LinkedinToResumeJson(null,true);\nwindow.linkedinToResumeJsonConverter.parseAndShowOutput();');
+
+// Run bookmarklet converter
+childProc.execSync('bookmarklet ./build/main.js ./build-bookmarklet/bookmarklet_export.js');
 
 // Get entire contents of processed bookmarklet code as var
 var bookmarkletContent = fs.readFileSync(buildFolder + 'bookmarklet_export.js');

@@ -1,3 +1,8 @@
-var fs = require('fs');
+const fs = require('fs');
+const requiredDirs = ['./build-bookmarklet','./build-browserext'];
 
-fs.mkdirSync('./build-bookmarklet');
+for (let x= 0; x<requiredDirs.length; x++){
+    if (!fs.existsSync(requiredDirs[x])){
+        fs.mkdirSync(requiredDirs[x]);
+    }
+}

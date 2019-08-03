@@ -26,109 +26,17 @@ var resumeJsonTemplate = {
 			"countryCode" : "",
 			"region" : ""
 		},
-		"profiles": [
-            /*
-			{
-				"network" : "",
-				"username" : "",
-				"url" : ""
-            }
-            */
-		]
+		"profiles": []
 	},
-	"work": [
-        /*
-		{
-			"company" : "",
-			"position" : "",
-			"website" : "",
-			"startDate" : "",
-			"endDate" : "",
-			"summary" : "",
-			"highlights": []
-        }
-        */
-	],
-	"volunteer": [
-        /*
-		{
-			"organization" : "",
-			"position" : "",
-			"website" : "",
-			"startDate" : "",
-			"endDate" : "",
-			"summary" : "",
-			"highlights": []
-        }
-        */
-	],
-	"education": [
-        /*
-		{
-			"institution" : "",
-			"area" : "",
-			"studyType" : "",
-			"startDate" : "",
-			"endDate" : "",
-			"gpa" : "",
-			"courses": []
-        }
-        */
-	],
-	"awards": [
-        /*
-		{
-			"title" : "",
-			"date" : "",
-			"awarder" : "",
-			"summary" : ""
-        }
-        */
-	],
-	"publications": [
-        /*
-		{
-			"name" : "",
-			"publisher" : "",
-			"releaseDate" : "",
-			"website" : "",
-			"summary" : ""
-        }
-        */
-	],
-	"skills": [
-        /*
-		{
-			"name" : "",
-			"level" : "",
-			"keywords": []
-        }
-        */
-	],
-	"languages": [
-        /*
-		{
-			"language" : "",
-			"fluency" : ""
-        }
-        */
-	],
-	"interests": [
-        /*
-		{
-			"name" : "",
-			"keywords": []
-        }
-        */
-	],
-	"references": [
-        /*
-		{
-			"name" : "",
-			"reference" : ""
-        }
-        */
-	]
+	"work": [],
+	"volunteer": [],
+	"education": [],
+	"awards": [],
+	"publications": [],
+	"skills": [],
+	"languages": [],
+	"interests": [],
+	"references": []
 }
 
 var LinkedinToResumeJson = (function(){

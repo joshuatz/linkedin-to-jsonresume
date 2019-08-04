@@ -4,7 +4,7 @@
 
 ## My LinkedIn Profile :) - [https://www.linkedin.com/in/joshuatzucker/](https://www.linkedin.com/in/joshuatzucker/)
 
-![Demo GIF](demo.gif "Demo Gif")
+![Demo GIF](demo-chrome_extension.gif "Demo Gif")
 
 ## Usage / Installation Options:
 There are a few different options for how to use this:

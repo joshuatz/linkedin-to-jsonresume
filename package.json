@@ -1,6 +1,6 @@
 {
     "name": "linkedin-to-json-resume-bookmarklet",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "Bookmarklet to grab details from your open LinkedIn profile page and export to JSON Resume Schema",
     "main": "src/main.js",
     "scripts": {
@@ -8,7 +8,8 @@
         "babel": "babel src --out-dir build",
         "webpack": "npx webpack --config webpack.config.js",
         "build-bookmarklet": "node prep-dirs.js && npm run webpack && node build-bookmarklet.js",
-        "build-browserext": "node prep-dirs.js && npm run webpack && node prep-browserext.js"
+        "build-browserext": "node prep-dirs.js && npm run webpack && node prep-browserext.js",
+        "package-browserext": "node prep-dirs.js && node package-browserext.js"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",
@@ -20,6 +21,7 @@
         "@babel/preset-env": "^7.4.4",
         "@babel/runtime": "^7.4.5",
         "@types/chrome": "0.0.87",
+        "archiver": "^3.1.1",
         "babel-loader": "^8.0.6",
         "bookmarklet": "",
         "fs-extra": "^8.1.0",

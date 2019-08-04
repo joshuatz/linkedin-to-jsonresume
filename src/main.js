@@ -605,7 +605,12 @@ window.LinkedinToResumeJson = (function(){
             stringified: JSON.stringify(_outputJson,null,2)
         };
         console.log(parsedExport);
-        this.showModal(parsedExport.raw);
+        if (this.parseSuccess){
+            this.showModal(parsedExport.raw);
+        }
+        else {
+            alert('Could not extract JSON from current page. Make sure you are on a profile page that you have access to');
+        }
     }
     LinkedinToResumeJson.prototype.closeModal = function(){
         let modalWrapperId = _toolPrefix + '_modalWrapper';

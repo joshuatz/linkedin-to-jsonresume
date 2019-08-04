@@ -104,9 +104,12 @@ window.LinkedinToResumeJson = (function(){
             currRow.key = currRow.entityUrn;
             db.data[currRow.entityUrn] = currRow;
         }
-        db.getValuesByKey = function(key){
+        db.getValuesByKey = function(key,OPT_tocValModifier){
             let values = [];
-            let tocVal = this.tableOfContents[key]
+            let tocVal = this.tableOfContents[key];
+            if (typeof(OPT_tocValModifier)==='function'){
+                tocVal = OPT_tocValModifier(tocVal);
+            }
             // tocVal will usually be a single string that is a key to another lookup. In rare cases, it is an array of direct keys
             let matchingDbIndexs = [];
             // Array of direct keys to sub items
@@ -137,6 +140,23 @@ window.LinkedinToResumeJson = (function(){
             return values;
         }
         return db;
+    }
+    /**
+     * Gets the profile ID from embedded (or api returned) Li JSON Schema
+     */
+    function getProfileIdFromLiSchema(jsonSchema){
+        let profileId = false;
+        // miniprofile is not usually in the TOC, nor does its entry have an entityUrn for looking up (it has objectUrn), so best solution is just to iterate through all entries checking for match.
+        if (jsonSchema.included && Array.isArray(jsonSchema.included)){
+            for (let x=0; x<jsonSchema.included.length; x++){
+                let currEntity = jsonSchema.included[x];
+                // Test for miniProfile match
+                if (typeof(currEntity['publicIdentifier'])==='string'){
+                    profileId = currEntity.publicIdentifier;
+                }
+            }
+        }
+        return profileId.toString();
     }
     function parseProfileSchemaJSON(instance,json){
         let profileParseSuccess = false;
@@ -414,7 +434,6 @@ window.LinkedinToResumeJson = (function(){
     function LinkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug){
         this.scannedPageUrl = '';
         this.parseSuccess = false;
-        this.profileId = this.getProfileId();
         this.exportBeyondSpec = typeof(OPT_exportBeyondSpec)==='boolean' ? OPT_exportBeyondSpec : false;
         this.debug = typeof(OPT_debug)==='boolean' ? OPT_debug : false;
         if (this.debug){
@@ -434,13 +453,23 @@ window.LinkedinToResumeJson = (function(){
         for (let x=0; x<possibleBlocks.length; x++){
             let currSchemaBlock = possibleBlocks[x];
             if (/educationView/.test(currSchemaBlock.innerHTML) && /positionView/.test(currSchemaBlock.innerHTML)){
-                doneWithBlockIterator = true;
-                foundSomeSchema = true;
                 try {
                     let embeddedJson = JSON.parse(currSchemaBlock.innerHTML);
-                    let profileParserResult = parseProfileSchemaJSON(_this,embeddedJson);
-                    if (_this.debug){
-                        console.log('Parse from embedded schema, success = ' + profileParserResult);
+                    // Due to SPA nature, tag could actually be for profile other than the one currently open
+                    let desiredProfileId = _this.getProfileId();
+                    let schemaProfileId = getProfileIdFromLiSchema(embeddedJson);
+                    if (schemaProfileId === desiredProfileId){
+                        doneWithBlockIterator = true;
+                        foundSomeSchema = true;
+                        let profileParserResult = parseProfileSchemaJSON(_this,embeddedJson);
+                        if (_this.debug){
+                            console.log('Parse from embedded schema, success = ' + profileParserResult);
+                        }
+                    }
+                    else {
+                        if (_this.debug){
+                            console.log('Valid schema found, but schema profile id of "' + schemaProfileId + '" does not match desired profile ID of "' + desiredProfileId + '".');
+                        }
                     }
                 }
                 catch (e){
@@ -482,6 +511,9 @@ window.LinkedinToResumeJson = (function(){
                 if (profileParserResult){
                     apiSuccessCount++;
                     fullProfileEndpointSuccess = true;
+                    if (this.debug){
+                        console.log('parseViaInternalApi = true');
+                    }
                 }
                 if (this.debug){
                     console.log(_outputJson);
@@ -586,11 +618,11 @@ window.LinkedinToResumeJson = (function(){
                 resolve(true);
             }
             else {
-                this.triggerAjaxLoadByScrolling(function(){
+                this.triggerAjaxLoadByScrolling(async function(){
                     _this.parseBasics();
                     _this.parseEmbeddedLiSchema();
                     if (!_this.parseSuccess){
-                        _this.parseViaInternalApi();
+                        await _this.parseViaInternalApi();
                     }
                     _this.scannedPageUrl = _this.getUrlWithoutQuery();
                     resolve(true);

@@ -12,7 +12,7 @@ There are a few different options for how to use this:
      - Feel free to install, use, and then immediately uninstall if you just need a single export
      - No data is collected
  - **Fast, but manual**: Using browser dev console
-     - Step 1: Copy the code from [`main.js`]() into your clipboard
+     - Step 1: Copy the code from [`main.js`](https://github.com/joshuatz/linkedin-to-jsonresume/blob/master/src/main.js) into your clipboard
      - Step 2: Navigate to a LinkedIn profile page, then paste the code into your console and run it
      - Step 3: Copy and run the following code:
         ```javascript
@@ -21,6 +21,9 @@ There are a few different options for how to use this:
  - [***Deprecated***] (at least for now): Bookmarklet
      - This was originally how this tool worked, but had to be retired as a valid method when LinkedIn added a stricter CSP that prevented it from working
      - Code to generate the bookmarklet is still in this repo if LI ever loosens the CSP
+
+## Troubleshooting
+When in doubt, refresh the profile page before using this tool.
 
 ---
 

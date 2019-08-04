@@ -33,3 +33,9 @@ If this ever garners enough interest and needs to be updated, I will probably wa
 
 # DISCLAIMER:
 This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
+
+# Attribution:
+Icon for browser extension:
+ - [https://www.iconfinder.com/icons/2470406/brand_linkedin_online_icon](https://www.iconfinder.com/icons/2470406/brand_linkedin_online_icon)
+     - Creative Commons (Attribution 3.0 Unported)
+     - [Full license](https://creativecommons.org/licenses/by/3.0/)

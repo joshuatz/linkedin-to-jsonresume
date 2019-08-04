@@ -1,7 +1,12 @@
 {
-    "name": "LinkedIn JSON Resume Export",
-    "description": "Export a LinkedIn profile to JSON Resume",
+    "name": "LinkedIn JSON Resume Exporter",
+    "description": "Export a LinkedIn profile page to JSON Resume",
     "manifest_version": 2,
+    "icons": {
+        "16": "icon-16.png",
+        "48": "icon-48.png",
+        "128": "icon-128.png"
+    },
     "page_action": {
         "default_popup": "popup.html"
     },

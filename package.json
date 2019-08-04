@@ -9,7 +9,7 @@
         "webpack": "npx webpack --config webpack.config.js",
         "build-bookmarklet": "node prep-dirs.js && npm run webpack && node build-bookmarklet.js",
         "build-browserext": "node prep-dirs.js && npm run webpack && node prep-browserext.js",
-        "package-browserext": "node prep-dirs.js && node package-browserext.js"
+        "package-browserext": "node prep-dirs.js && npm run build-browserext && node package-browserext.js"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",

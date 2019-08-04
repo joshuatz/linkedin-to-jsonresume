@@ -485,7 +485,7 @@ window.LinkedinToResumeJson = (function(){
                 break;
             }
         }
-        if (!foundSomeSchema && this.debug){
+        if (!foundSomeSchema && _this.debug){
             console.warn('Failed to find any embedded schema blocks!');
         }
     }
@@ -785,6 +785,7 @@ window.LinkedinToResumeJson = (function(){
      * Special - Fetch with authenticated internal API
      */
     LinkedinToResumeJson.prototype.voyagerFetch = async function(endpoint){
+        let _this = this;
         // Macro support
         endpoint = endpoint.replace('{profileId}',this.profileId);
         if (!endpoint.startsWith('https')){
@@ -807,7 +808,7 @@ window.LinkedinToResumeJson = (function(){
                     "method" : "GET",
                     "mode" : "cors"
                 };
-                if (this.debug){
+                if (_this.debug){
                     console.log(fetchOptions);
                 }
                 fetch(endpoint,fetchOptions).then(function(response){

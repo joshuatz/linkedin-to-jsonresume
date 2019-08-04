@@ -3,7 +3,7 @@ document.getElementById('liToJsonButton').addEventListener('click',function(){
         file: 'main.js'
     },function(){
         chrome.tabs.executeScript({
-            code: 'window.linkedinToResumeJsonConverter = new LinkedinToResumeJson(false,false);\nwindow.linkedinToResumeJsonConverter.parseAndShowOutput();'
+            code: '(new LinkedinToResumeJson(false,false)).parseAndShowOutput();'
         },function(){
             setTimeout(function(){
                 // Close popup

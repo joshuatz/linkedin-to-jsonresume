@@ -1,4 +1,4 @@
-# LinkedIn Profile to JSON Resume Bookmarklet
+# LinkedIn Profile to JSON Resume Browser Tool
 
 ## Chrome Extension - [Here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
 

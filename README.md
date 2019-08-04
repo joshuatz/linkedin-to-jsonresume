@@ -1,10 +1,14 @@
 # LinkedIn Profile to JSON Resume Bookmarklet
 
+## Chrome Extension - [Here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
+
+## My LinkedIn Profile :) - [https://www.linkedin.com/in/joshuatzucker/](https://www.linkedin.com/in/joshuatzucker/)
+
 ![Demo GIF](demo.gif "Demo Gif")
 
 ## Usage / Installation Options:
 There are a few different options for how to use this:
- - **Fast and simple**: Chrome Extension - [Get it here](REPLACE ME REPLACE ME)
+ - **Fast and simple**: Chrome Extension - [Get it here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
      - Feel free to install, use, and then immediately uninstall if you just need a single export
      - No data is collected
  - **Fast, but manual**: Using browser dev console

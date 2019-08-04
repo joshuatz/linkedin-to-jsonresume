@@ -1,6 +1,16 @@
 {
     "name": "LinkedIn JSON Resume Export",
-    "version": "0.0.1",
     "description": "Export a LinkedIn profile to JSON Resume",
-    "manifest_version": 2
+    "manifest_version": 2,
+    "page_action": {
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "scripts": ["background.js"],
+        "persistent": false
+    },
+    "permissions": [
+        "https://*.linkedin.com/",
+        "declarativeContent"
+    ]
 }

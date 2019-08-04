@@ -3,3 +3,4 @@ build
 build-bookmarklet
 build-browserext
 !build/.gitignore
+.vscode

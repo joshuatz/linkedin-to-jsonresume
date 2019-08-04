@@ -11,6 +11,7 @@
     },
     "permissions": [
         "https://*.linkedin.com/",
-        "declarativeContent"
+        "declarativeContent",
+        "activeTab"
     ]
 }

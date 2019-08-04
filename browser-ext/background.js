@@ -16,3 +16,11 @@ chrome.runtime.onInstalled.addListener(function(){
         }]);
     });
 });
+
+chrome.runtime.onMessage.addListener(function(msg,cb){
+    if (msg === 'inject'){
+        chrome.tabs.executeScript({
+            file: 'main.js'
+        });
+    }
+});

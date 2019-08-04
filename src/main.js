@@ -39,7 +39,7 @@ var resumeJsonTemplate = {
 	"references": []
 }
 
-var LinkedinToResumeJson = (function(){
+window.LinkedinToResumeJson = (function(){
     // private
     let _outputJson = resumeJsonTemplate;
     let _templateJson = resumeJsonTemplate;

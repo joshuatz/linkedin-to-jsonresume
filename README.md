@@ -1,6 +1,6 @@
 # LinkedIn Profile to JSON Resume Browser Tool
 
-## Chrome Extension - [Here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
+## Chrome Extension - [Here](https://chrome.google.com/webstore/detail/json-resume-exporter/caobgmmcpklomkcckaenhjlokpmfbdec)
 
 ## My LinkedIn Profile :) - [https://www.linkedin.com/in/joshuatzucker/](https://www.linkedin.com/in/joshuatzucker/)
 
@@ -33,8 +33,11 @@ When in doubt, refresh the profile page before using this tool.
 ### 7/22/2019:
 > ***ALERT***: This bookmarklet is currently broken, thanks to LinkedIn adding a new restrictive CSP (Content Security Policy) header to the site. [I've opened an issue](https://github.com/joshuatz/linkedin-to-jsonresume-bookmarklet/issues/1) to discuss this, and both short-term (requires using the console) and long-term (browser extension) solutions.
 
-### 6/21/2019:
+### 6/21/2019 - v.0.0.3
 > I saw the bookmarklet was broken depending on how you came to the profile page, so I refactored a bunch of code and found a much better way to pull the data. Should be much more reliable!
+
+### 9/12/2019 - v.0.0.4
+Updated Chrome webstore stuff to avoid LI IP usage (Google took down extension page due to complaint). Updated actual scraper code to grab full list of skills vs just highlighted.
 
 ---
 

@@ -68,6 +68,4 @@ This tool is not affiliated with LinkedIn in any manner. Intended use is to expo
 
 ## Attribution:
 Icon for browser extension:
- - [https://www.iconfinder.com/icons/2470406/brand_linkedin_online_icon](https://www.iconfinder.com/icons/2470406/brand_linkedin_online_icon)
-     - Creative Commons (Attribution 3.0 Unported)
-     - [Full license](https://creativecommons.org/licenses/by/3.0/)
+ - [https://www.iconfinder.com/icons/95928/arrow_down_download_profile_icon](https://www.iconfinder.com/icons/95928/arrow_down_download_profile_icon)

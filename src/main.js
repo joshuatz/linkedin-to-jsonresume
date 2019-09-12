@@ -649,9 +649,17 @@ window.LinkedinToResumeJson = (function(){
             else {
                 this.triggerAjaxLoadByScrolling(async function(){
                     _this.parseBasics();
-                    _this.parseEmbeddedLiSchema();
-                    if (!_this.parseSuccess || _this.preferApi){
+                    if (_this.preferApi === false){
+                        _this.parseEmbeddedLiSchema();
+                        if (!_this.parseSuccess){
+                            await _this.parseViaInternalApi();
+                        }
+                    }
+                    else {
                         await _this.parseViaInternalApi();
+                        if (!_this.parseSuccess){
+                            this.parseEmbeddedLiSchema();
+                        }
                     }
                     _this.scannedPageUrl = _this.getUrlWithoutQuery();
                     resolve(true);

@@ -55,13 +55,15 @@ window.LinkedinToResumeJson = (function(){
         awards: '*honorView',
         publications: '*publicationView'
     }
+    let _voyagerBase = 'https://www.linkedin.com/voyager/api';
     let _voyagerEndpoints = {
         following : '/identity/profiles/{profileId}/following',
         followingCompanies: '/identity/profiles/{profileId}/following?count=10&entityType=COMPANY&q=followedEntities',
         contactInfo : '/identity/profiles/{profileId}/profileContactInfo',
         basicAboutMe : '/me',
         advancedAboutMe : '/identity/profiles/{profileId}',
-        fullProfileView : '/identity/profiles/{profileId}/profileView'
+        fullProfileView : '/identity/profiles/{profileId}/profileView',
+        fullSkills: '/identity/profiles/{profileId}/skillCategory'
     }
     let _scrolledToLoad = false;
     let _toolPrefix = 'jtzLiToResumeJson';
@@ -217,7 +219,7 @@ window.LinkedinToResumeJson = (function(){
                         name: attachment.title,
                         startDate: '',
                         summary: attachment.description,
-                        url: project.url
+                        url: url
                     });
                 }
             });
@@ -333,11 +335,7 @@ window.LinkedinToResumeJson = (function(){
                 }
             });
             skillArr.forEach(function(skillName){
-                _outputJson.skills.push({
-                    name: skillName,
-                    level: '',
-                    keywords: []
-                });
+                pushSkill(skillName);
             });
 
             // Parse recommendations
@@ -430,11 +428,24 @@ window.LinkedinToResumeJson = (function(){
         }
         return profileParseSuccess;
     }
+    function pushSkill(skillName){
+        // Try to prevent duplicate skills
+        let skillNames = _outputJson.skills.map((skill)=>skill.name);
+        if (skillNames.indexOf(skillName)==-1){
+            _outputJson.skills.push({
+                name: skillName,
+                level: '',
+                keywords: []
+            });
+        }
+    }
     // Constructor
-    function LinkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug){
+    function LinkedinToResumeJson(OPT_exportBeyondSpec,OPT_debug,OPT_preferApi,OPT_getFullSkills){
         this.scannedPageUrl = '';
         this.parseSuccess = false;
+        this.getFullSkills = typeof(OPT_getFullSkills)==='boolean' ? OPT_getFullSkills : true;
         this.exportBeyondSpec = typeof(OPT_exportBeyondSpec)==='boolean' ? OPT_exportBeyondSpec : false;
+        this.preferApi = typeof(OPT_preferApi)==='boolean' ? OPT_preferApi : true;
         this.debug = typeof(OPT_debug)==='boolean' ? OPT_debug : false;
         if (this.debug){
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
@@ -517,6 +528,24 @@ window.LinkedinToResumeJson = (function(){
                 }
                 if (this.debug){
                     console.log(_outputJson);
+                }
+            }
+
+            // Get full skills, behind voyager endpoint
+            if (this.getFullSkills){
+                let liType = 'com.linkedin.voyager.identity.profile.Skill';
+                let fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
+                if (fullSkillsInfo && typeof(fullSkillsInfo.data)==='object'){
+                    apiSuccessCount++;
+                    let metaData = fullSkillsInfo.data.metadata;
+                    if (Array.isArray(fullSkillsInfo.included)){
+                        for (let x=0; x<fullSkillsInfo.included.length; x++){
+                            let skillObj = fullSkillsInfo.included[x];
+                            if (typeof(skillObj.name)==='string'){
+                                pushSkill(skillObj.name);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -621,7 +650,7 @@ window.LinkedinToResumeJson = (function(){
                 this.triggerAjaxLoadByScrolling(async function(){
                     _this.parseBasics();
                     _this.parseEmbeddedLiSchema();
-                    if (!_this.parseSuccess){
+                    if (!_this.parseSuccess || _this.preferApi){
                         await _this.parseViaInternalApi();
                     }
                     _this.scannedPageUrl = _this.getUrlWithoutQuery();
@@ -789,7 +818,7 @@ window.LinkedinToResumeJson = (function(){
         // Macro support
         endpoint = endpoint.replace('{profileId}',this.profileId);
         if (!endpoint.startsWith('https')){
-            endpoint = 'https://www.linkedin.com/voyager/api' + endpoint;
+            endpoint = _voyagerBase + endpoint;
         }
         return new Promise(function(resolve,reject){
             // Get the csrf token - should be stored as a cookie

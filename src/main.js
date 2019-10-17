@@ -41,6 +41,65 @@ var resumeJsonTemplate = {
 
 window.LinkedinToResumeJson = (function(){
     // private
+    const maxDaysOfMonth = {
+        1: 31,
+        2: 28,
+        3: 31,
+        4: 30,
+        5: 31,
+        6: 30,
+        7: 31,
+        8: 31,
+        9: 30,
+        10: 31,
+        11: 30,
+        12: 31,
+    };
+    
+    /**
+     * Returns month. If it is only one digit, adds a 0 and returns it as a string.
+     * @param {Number} m month
+     */
+    const getMonth = m => {
+        if (!m) return 12;
+        if (isOneDigit(m)) {
+            return `0${m}`;
+        }
+        return m;
+    }
+    
+    /**
+     * Gets day. 
+     * @param {Number} d day
+     * @param {Number} m month
+     */
+    const getDay = (d, m) => {
+        if (!d) {
+            if (!m) return 31;
+            return maxDaysOfMonth[m];
+        }
+        if (isOneDigit(d)) {
+            return `0${d}`;
+        }
+        return d;
+    };
+
+    /**
+     * Checks if value passed is a one digit number
+     * @param {Number} v 
+     */
+    const isOneDigit = (v) => {
+        return  v < 10 || v.length && v.length == 1;
+    }
+    
+
+    /**
+     * Parses an object with year, month and day and returns a string with the date. 
+     * If month is not present, should return 12, and if day is not present, should return last month day.
+     * @param {{year, month, day}} dateObj 
+     */
+    const parseDate = (dateObj) => dateObj && dateObj.year ? `${dateObj.year}-${getMonth(dateObj.month)}-${getDay(dateObj.day, dateObj.month)}` : '';
+    
     let _outputJson = resumeJsonTemplate;
     let _templateJson = resumeJsonTemplate;
     let _liSchemaKeys = {
@@ -237,10 +296,10 @@ window.LinkedinToResumeJson = (function(){
                 }
                 if (edu.timePeriod && typeof(edu.timePeriod)==='object'){
                     if (edu.timePeriod.startDate && typeof(edu.timePeriod.startDate)==='object'){
-                        parsedEdu.startDate = edu.timePeriod.startDate.year + '-12-31';
+                        parsedEdu.startDate = parseDate(edu.timePeriod.startDate);
                     }
                     if (edu.timePeriod.endDate && typeof(edu.timePeriod.endDate)==='object'){
-                        parsedEdu.endDate = edu.timePeriod.endDate.year + '-12-31';
+                        parsedEdu.endDate = parseDate(edu.timePeriod.endDate);
                     }
                 }
                 if (Array.isArray(edu.courses)){
@@ -275,10 +334,10 @@ window.LinkedinToResumeJson = (function(){
                 }
                 if (position.timePeriod && typeof(position.timePeriod)==='object'){
                     if (position.timePeriod.endDate && typeof(position.timePeriod.endDate)==='object'){
-                        parsedWork.endDate = position.timePeriod.endDate.year + '-' + position.timePeriod.endDate.month + '-31';
+                        parsedWork.endDate = parseDate(position.timePeriod.endDate);
                     }
                     if (position.timePeriod.startDate && typeof(position.timePeriod.startDate)==='object'){
-                        parsedWork.startDate = position.timePeriod.startDate.year + '-' + position.timePeriod.startDate.month + '-31';
+                        parsedWork.startDate = parseDate(position.timePeriod.startDate);
                     }
                 }
                 // Lookup company website
@@ -304,10 +363,10 @@ window.LinkedinToResumeJson = (function(){
                 }
                 if (volunteering.timePeriod && typeof(volunteering.timePeriod)==='object'){
                     if (typeof(volunteering.timePeriod.endDate)==='object' && volunteering.timePeriod.endDate!==null){
-                        parsedVolunteerWork.endDate = volunteering.timePeriod.endDate.year + '-' + volunteering.timePeriod.endDate.month + '-31';
+                        parsedVolunteerWork.endDate = parseDate(volunteering.timePeriod.endDate);
                     }
                     if (typeof(volunteering.timePeriod.startDate)==='object' && volunteering.timePeriod.startDate!==null){
-                        parsedVolunteerWork.startDate = volunteering.timePeriod.startDate.year + '-' + volunteering.timePeriod.startDate.month + '-31';
+                        parsedVolunteerWork.startDate = parseDate(volunteering.timePeriod.startDate);
                     }
                 }
 
@@ -375,7 +434,7 @@ window.LinkedinToResumeJson = (function(){
                         url: project.url
                     };
                     if (project.timePeriod && typeof(project.timePeriod)==='object'){
-                        parsedProject.startDate = project.timePeriod.startDate + '-12-31';
+                        parsedProject.startDate = parseDate(project.timePeriod.startDate);
                     }
                     _outputJson.projects.push(parsedProject);
                 });
@@ -390,7 +449,7 @@ window.LinkedinToResumeJson = (function(){
                     summary: noNull(award.description)
                 };
                 if (award.issueDate && typeof(award.issueDate)==='object'){
-                    parsedAward.date = award.issueDate.year + '-' + award.issueDate.month + '-31';
+                    parsedAward.date = parseDate(award.issueDate);
                 }
                 _outputJson.awards.push(parsedAward);
             });
@@ -405,7 +464,7 @@ window.LinkedinToResumeJson = (function(){
                     summary: noNull(publication.description)
                 };
                 if (typeof(publication.date)==='object' && typeof(publication.date.year)!=='undefined'){
-                    parsedPublication.releaseDate = publication.date.year + '-' + publication.date.month + '-' + publication.date.day;
+                    parsedPublication.releaseDate = parseDate(publication.date);
                 }
                 _outputJson.publications.push(parsedPublication);
             });

@@ -89,7 +89,7 @@ window.LinkedinToResumeJson = (function(){
      * @param {Number} v 
      */
     const isOneDigit = (v) => {
-        return  v < 10 || v.length && v.length == 1;
+        return Number(v) < 10;
     }
     
 

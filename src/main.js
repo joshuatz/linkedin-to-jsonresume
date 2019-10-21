@@ -399,17 +399,20 @@ window.LinkedinToResumeJson = (function(){
 
             // Parse recommendations
             let recommendationHashes = [];
-            document.querySelectorAll('#recommendation-list > li').forEach(function(elem){
-                // Click the see more button
-                // let clickMore = elem.querySelector('a[class*="__more"][href="#"]');
-                // if (clickMore){
-                //     clickMore.click();
-                // }
-                if (elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]')){
+            document.querySelectorAll('.pv-recommendations-section artdeco-tabpanel.active li').forEach(function(elem){
+                if (elem.querySelector('blockquote span[class*="line-clamp"]')){
+                    // Click the see more button
+                    const recommendationSeeMoreButton = elem.querySelector('blockquote span.lt-line-clamp__ellipsis a');
+                    if (recommendationSeeMoreButton) {
+                        recommendationSeeMoreButton.click();
+                    }
+                    const textArray = [];
+                    elem.querySelectorAll('blockquote span[class*="line-clamp"]').forEach(elem => textArray.push(elem.innerText));
+                    
                     let rawRefData = {
                         name: elem.querySelector('h3').innerText,
                         title: elem.querySelector('p[class*="headline"]').innerText,
-                        text: elem.querySelector('blockquote span[class*="line-clamp"][class*="raw"]').innerText
+                        text: textArray.join(' ')
                     }
                     let hash = rawRefData.name + '|' + rawRefData.title;
                     if (!recommendationHashes.includes(hash)){

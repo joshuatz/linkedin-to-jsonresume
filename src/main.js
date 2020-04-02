@@ -157,7 +157,7 @@ window.LinkedinToResumeJson = (() => {
             currRow.key = currRow.entityUrn;
             db.data[currRow.entityUrn] = currRow;
         }
-        db.getValuesByKey = (key, optTocValModifier) => {
+        db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
             if (typeof optTocValModifier === 'function') {
@@ -475,14 +475,20 @@ window.LinkedinToResumeJson = (() => {
                 }
                 _outputJson.publications.push(parsedPublication);
             });
+
             if (_this.debug) {
-                console.log(_outputJson);
+                console.group(`parseProfileSchemaJSON complete:`);
+                console.log({
+                    db,
+                    _outputJson
+                });
+                console.groupEnd();
             }
+
             _this.parseSuccess = true;
             profileParseSuccess = true;
         } catch (e) {
             if (_this.debug) {
-                console.error('Error parsing profile schema');
                 console.group('Error parsing profile schema');
                 console.log(e);
                 console.log('Instance');
@@ -609,11 +615,13 @@ window.LinkedinToResumeJson = (() => {
                 // Get basic contact info
                 const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
                 if (contactInfo && typeof contactInfo.data === 'object') {
+                    const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
                     _outputJson.basics.location.address = contactInfo.data.address;
-                    _outputJson.basics.email = contactInfo.data.emailAddress;
-                    _outputJson.basics.phone = noNull(contactInfo.data.phoneNumbers);
-                    if (Array.isArray(contactInfo.data.websites)) {
-                        const { websites } = contactInfo.data;
+                    _outputJson.basics.email = emailAddress;
+                    _outputJson.basics.phone = noNull(phoneNumbers);
+
+                    // Scrape Websites
+                    if (Array.isArray(websites)) {
                         for (let x = 0; x < websites.length; x++) {
                             if (/portfolio/i.test(websites[x].type.category)) {
                                 _outputJson.basics.website = websites[x].url;
@@ -697,12 +705,12 @@ window.LinkedinToResumeJson = (() => {
         const _this = this;
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve) => {
-            if (this.parseSuccess && this.scannedPageUrl !== this.getUrlWithoutQuery()) {
+            if (_this.parseSuccess && _this.scannedPageUrl !== _this.getUrlWithoutQuery()) {
                 // Parse already done, but page changed (ajax)
-                await this.forceReParse();
+                await _this.forceReParse();
                 resolve(true);
             } else {
-                this.triggerAjaxLoadByScrolling(async () => {
+                _this.triggerAjaxLoadByScrolling(async () => {
                     _this.parseBasics();
                     if (_this.preferApi === false) {
                         _this.parseEmbeddedLiSchema();
@@ -903,7 +911,7 @@ window.LinkedinToResumeJson = (() => {
                     mode: 'cors'
                 };
                 if (_this.debug) {
-                    console.log(fetchOptions);
+                    console.log(`Fetching: ${endpoint}`);
                 }
                 fetch(endpoint, fetchOptions).then((response) => {
                     if (response.status !== 200) {

@@ -1,6 +1,7 @@
 const path = require('path');
 
 module.exports = {
+    mode: 'production',
     entry: './src/main.js',
     output: {
         filename: 'main.js',
@@ -14,6 +15,5 @@ module.exports = {
                 loader: 'babel-loader'
             }
         ]
-    },
-    mode: 'production'
+    }
 };

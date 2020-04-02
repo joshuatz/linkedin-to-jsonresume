@@ -5,29 +5,29 @@ const fse = require('fs-extra');
 const archiver = require('archiver');
 
 // Get version info
-const versionString = require("./package.json").version.toString();
+const versionString = require('./package.json').version.toString();
 
-var output = fse.createWriteStream("./webstore-zips/build_"+versionString+".zip");
-var archive = archiver("zip", {
-    zlib : {level : 6} // compression level
+const output = fse.createWriteStream(`./webstore-zips/build_${versionString}.zip`);
+const archive = archiver('zip', {
+    zlib: { level: 6 } // compression level
 });
 
-// listen for all archive data to be written 
-output.on("close", function() {
-  console.log(archive.pointer() + " total bytes");
-  console.log("archiver has been finalized and the output file descriptor has closed.");
+// listen for all archive data to be written
+output.on('close', () => {
+    console.log(`${archive.pointer()} total bytes`);
+    console.log('archiver has been finalized and the output file descriptor has closed.');
 });
- 
-// good practice to catch this error explicitly 
-archive.on("error", function(err) {
-  throw err;
+
+// good practice to catch this error explicitly
+archive.on('error', (err) => {
+    throw err;
 });
- 
-// pipe archive data to the file 
+
+// pipe archive data to the file
 archive.pipe(output);
- 
-// append files from a directory 
-archive.directory("./build-browserext/","");
- 
-// finalize the archive (ie we are done appending files but streams have to finish yet) 
+
+// append files from a directory
+archive.directory('./build-browserext/', '');
+
+// finalize the archive (ie we are done appending files but streams have to finish yet)
 archive.finalize();

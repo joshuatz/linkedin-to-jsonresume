@@ -6,14 +6,15 @@
     "scripts": {
         "test": "\"Error: no test specified\" && exit 1",
         "babel": "babel src --out-dir build",
-        "webpack": "npx webpack --config webpack.config.js",
+        "webpack": "npx webpack --config webpack.prod.js",
+        "webpack-debug": "npx webpack --config webpack.dev.js",
         "build-bookmarklet": "node prep-dirs.js && npm run webpack && node build-bookmarklet.js",
         "build-browserext": "node prep-dirs.js && npm run webpack && node prep-browserext.js",
+        "build-browserext-debug": "node prep-dirs.js && npm run webpack-debug && node prep-browserext.js",
         "package-browserext": "node prep-dirs.js && npm run build-browserext && node package-browserext.js"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",
-    "dependencies": {},
     "devDependencies": {
         "@babel/cli": "^7.7.7",
         "@babel/core": "^7.7.7",
@@ -24,7 +25,13 @@
         "archiver": "^3.1.1",
         "babel-loader": "^8.0.6",
         "bookmarklet": "",
+        "eslint": "^6.8.0",
+        "eslint-config-airbnb-base": "^14.1.0",
+        "eslint-config-prettier": "^6.10.1",
+        "eslint-plugin-import": "^2.20.1",
+        "eslint-plugin-prettier": "^3.1.2",
         "fs-extra": "^8.1.0",
+        "prettier": "^2.0.2",
         "replace": "^1.1.3",
         "webpack": "^4.41.5",
         "webpack-cli": "^3.3.10"

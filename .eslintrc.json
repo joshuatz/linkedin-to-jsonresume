@@ -1,0 +1,27 @@
+{
+  "extends": ["airbnb-base","plugin:prettier/recommended"],
+  "parserOptions": {
+    "ecmaVersion": 2018
+  },
+  "env": {
+    "browser": true
+  },
+  "rules": {
+    "no-underscore-dangle": "off",
+    "no-plusplus": "off",
+    "no-useless-escape": "off",
+    "no-console": "off",
+    "no-alert": "off",
+    "no-lonely-if": "off",
+    "dot-notation": "off",
+    "camelcase": [
+      "error",
+      {
+        "allow": ["^OPT_"]
+      }
+    ]
+  },
+  "globals": {
+    "chrome": "readonly"
+  }
+}

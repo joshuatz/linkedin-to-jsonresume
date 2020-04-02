@@ -51,7 +51,7 @@ I made this because I wanted a way to quickly generate a JSON Resume export from
 > With the rewrite to a browser extension, I actually configured the build scripts to be able to still create a bookmarklet from the same codebase, in case the bookmarklet ever becomes a viable option again.
 
 ### Building the browser extension
-`npm run build-browserext` will transpile and copy all the right files to `./build-browserext`, which you can then sideload into your browser. If you want to produce a single ZIP archive for the extension, `npm run package-browserext` will do that.
+`npm run build-browserext` will transpile and copy all the right files to `./build-browserext`, which you can then side-load into your browser. If you want to produce a single ZIP archive for the extension, `npm run package-browserext` will do that.
 
 ### Building the bookmarklet version
 Currently, the build process looks like this:
@@ -65,7 +65,7 @@ If this ever garners enough interest and needs to be updated, I will probably wa
 ---
 
 ## DISCLAIMER:
-This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
+This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not responsible for any misuse, or repercussions of said misuse.
 
 ## Attribution:
 Icon for browser extension:

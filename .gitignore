@@ -4,6 +4,5 @@ build-bookmarklet
 build-browserext
 webstore-zips
 !build/.gitignore
-.vscode
 *.pem
 *.crx

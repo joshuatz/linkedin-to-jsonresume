@@ -19,7 +19,10 @@
       {
         "allow": ["^OPT_"]
       }
-    ]
+    ],
+    "indent": ["error", 4],
+    "max-len": ["error", 300],
+    "comma-dangle": "off"
   },
   "globals": {
     "chrome": "readonly"

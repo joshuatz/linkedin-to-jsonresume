@@ -60,9 +60,7 @@ window.LinkedinToResumeJson = (() => {
      * Checks if value passed is a one digit number
      * @param {Number} v
      */
-    const isOneDigit = (v) => {
-        return Number(v) < 10;
-    };
+    const isOneDigit = (v) => Number(v) < 10;
 
     /**
      * Returns month. If it is only one digit, adds a 0 and returns it as a string.
@@ -477,7 +475,7 @@ window.LinkedinToResumeJson = (() => {
             });
 
             if (_this.debug) {
-                console.group(`parseProfileSchemaJSON complete:`);
+                console.group('parseProfileSchemaJSON complete:');
                 console.log({
                     db,
                     _outputJson

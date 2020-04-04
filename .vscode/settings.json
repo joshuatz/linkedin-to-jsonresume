@@ -3,10 +3,7 @@
     "editor.tabSize": 4,
     "[javascript]": {
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "esbenp.prettier-vscode",
-        "editor.codeActionsOnSave": {
-            "source.fixAll": false
-        }
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
     "files.eol": "\n"
 }

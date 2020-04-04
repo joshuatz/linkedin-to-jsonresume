@@ -22,7 +22,11 @@
     ],
     "indent": ["error", 4],
     "max-len": ["error", 300],
-    "comma-dangle": "off"
+    "comma-dangle": "off",
+    "prefer-destructuring": ["error", {
+      "array": false,
+      "object": true
+    }]
   },
   "globals": {
     "chrome": "readonly"

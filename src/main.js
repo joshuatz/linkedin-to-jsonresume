@@ -874,14 +874,24 @@ window.LinkedinToResumeJson = (() => {
      * Get the profile ID / User ID of the user by parsing URL first, then page.
      */
     LinkedinToResumeJson.prototype.getProfileId = function getProfileId() {
+        let profileId;
         const linkedProfileRegUrl = /linkedin.com\/[^\/]*\/([^\/]+)\/[^\/]*$/im;
         const linkedProfileRegApi = /voyager\/api\/.*\/profiles\/([^\/]+)\/.*/im;
         if (linkedProfileRegUrl.test(document.location.href)) {
-            return linkedProfileRegUrl.exec(document.location.href)[1];
+            profileId = linkedProfileRegUrl.exec(document.location.href)[1];
         }
-        if (linkedProfileRegApi.test(document.body.innerHTML)) {
-            return linkedProfileRegApi.exec(document.body.innerHTML)[1];
+
+        // Fallback to finding in HTML source.
+        // Warning: This can get stale between pages, or might return your own ID instead of current profile
+        if (!profileId && linkedProfileRegApi.test(document.body.innerHTML)) {
+            profileId = linkedProfileRegApi.exec(document.body.innerHTML)[1];
         }
+
+        if (profileId) {
+            // In case username contains special characters
+            return decodeURI(profileId);
+        }
+
         return false;
     };
 

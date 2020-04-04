@@ -130,9 +130,9 @@ window.LinkedinToResumeJson = (() => {
         return v ? v[2] : null;
     }
 
-    function noNull(value, optDefaultVal) {
+    function noNullOrUndef(value, optDefaultVal) {
         const defaultVal = optDefaultVal || '';
-        return value === null ? defaultVal : value;
+        return typeof value === 'undefined' || value === null ? defaultVal : value;
     }
 
     function buildDbFromLiSchema(schemaJson) {
@@ -236,12 +236,12 @@ window.LinkedinToResumeJson = (() => {
                 if (!profileGrabbed) {
                     profileGrabbed = true;
                     _outputJson.basics.name = `${profile.firstName} ${profile.lastName}`;
-                    _outputJson.basics.summary = noNull(profile.summary);
-                    _outputJson.basics.label = noNull(profile.headline);
+                    _outputJson.basics.summary = noNullOrUndef(profile.summary);
+                    _outputJson.basics.label = noNullOrUndef(profile.headline);
                     if (profile.address) {
-                        _outputJson.basics.location.address = profile.address;
+                        _outputJson.basics.location.address = noNullOrUndef(profile.address);
                     } else if (profile.locationName) {
-                        _outputJson.basics.location.address = profile.locationName;
+                        _outputJson.basics.location.address = noNullOrUndef(profile.locationName);
                     }
                     _outputJson.basics.location.countryCode = profile.defaultLocale.country;
                     _outputJson.languages.push({
@@ -288,12 +288,12 @@ window.LinkedinToResumeJson = (() => {
             // Parse education
             db.getValuesByKey(_liSchemaKeys.education).forEach((edu) => {
                 const parsedEdu = {
-                    institution: noNull(edu.schoolName),
-                    area: noNull(edu.fieldOfStudy),
-                    studyType: noNull(edu.degreeName),
+                    institution: noNullOrUndef(edu.schoolName),
+                    area: noNullOrUndef(edu.fieldOfStudy),
+                    studyType: noNullOrUndef(edu.degreeName),
                     startDate: '',
                     endDate: '',
-                    gpa: noNull(edu.grade),
+                    gpa: noNullOrUndef(edu.grade),
                     courses: []
                 };
                 if (edu.timePeriod && typeof edu.timePeriod === 'object') {
@@ -451,7 +451,7 @@ window.LinkedinToResumeJson = (() => {
                     title: award.title,
                     date: '',
                     awarder: award.issuer,
-                    summary: noNull(award.description)
+                    summary: noNullOrUndef(award.description)
                 };
                 if (award.issueDate && typeof award.issueDate === 'object') {
                     parsedAward.date = parseDate(award.issueDate);
@@ -465,8 +465,8 @@ window.LinkedinToResumeJson = (() => {
                     name: publication.name,
                     publisher: publication.publisher,
                     releaseDate: '',
-                    website: noNull(publication.url),
-                    summary: noNull(publication.description)
+                    website: noNullOrUndef(publication.url),
+                    summary: noNullOrUndef(publication.description)
                 };
                 if (typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
                     parsedPublication.releaseDate = parseDate(publication.date);
@@ -608,27 +608,42 @@ window.LinkedinToResumeJson = (() => {
                 }
             }
 
-            // Only continue with other endpoints if full profile API failed
-            if (!fullProfileEndpointSuccess) {
-                // Get basic contact info
-                const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-                if (contactInfo && typeof contactInfo.data === 'object') {
-                    const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
-                    _outputJson.basics.location.address = contactInfo.data.address;
-                    _outputJson.basics.email = emailAddress;
-                    _outputJson.basics.phone = noNull(phoneNumbers);
-
-                    // Scrape Websites
-                    if (Array.isArray(websites)) {
-                        for (let x = 0; x < websites.length; x++) {
-                            if (/portfolio/i.test(websites[x].type.category)) {
-                                _outputJson.basics.website = websites[x].url;
-                            }
-                        }
-                    }
-                    apiSuccessCount++;
+            // Always get full contact info, behind voyager endpoint
+            const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
+            if (contactInfo && typeof contactInfo.data === 'object') {
+                const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
+                _outputJson.basics.location.address = noNullOrUndef(contactInfo.data.address, _outputJson.basics.location.address);
+                _outputJson.basics.email = noNullOrUndef(emailAddress, _outputJson.basics.email);
+                if (phoneNumbers && phoneNumbers.length) {
+                    _outputJson.basics.phone = noNullOrUndef(phoneNumbers[0].number);
                 }
 
+                // Scrape Websites
+                if (Array.isArray(websites)) {
+                    for (let x = 0; x < websites.length; x++) {
+                        if (/portfolio/i.test(websites[x].type.category)) {
+                            _outputJson.basics.website = websites[x].url;
+                        }
+                    }
+                }
+
+                // Scrape Twitter
+                if (Array.isArray(twitterHandles)) {
+                    twitterHandles.forEach((handleMeta) => {
+                        const handle = handleMeta.name;
+                        _outputJson.basics.profiles.push({
+                            network: 'Twitter',
+                            username: handle,
+                            url: `https://twitter.com/${handle}`
+                        });
+                    });
+                }
+
+                apiSuccessCount++;
+            }
+
+            // Only continue with other endpoints if full profile API failed
+            if (!fullProfileEndpointSuccess) {
                 const basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
                 if (basicAboutMe && typeof basicAboutMe.data === 'object') {
                     if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {

@@ -18,3 +18,5 @@ document.getElementById('liToJsonButton').addEventListener('click', () => {
         }
     );
 });
+
+document.getElementById('versionDisplay').innerText = chrome.runtime.getManifest().version;

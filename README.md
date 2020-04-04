@@ -30,6 +30,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+4/4/2020 | 0.0.8 | Added version string display to popup
 4/4/2020 | 0.0.7 | Fixed and improved contact info collection (phone, Twitter, and email). Miscellaneous other tweaks.
 10/22/2019 | 0.0.6 | Updated recommendation querySelector after LI changed DOM. Thanks again, @ [lucbpz](https://github.com/lucbpz).
 10/19/2019 | 0.0.5 | Updated LI date parser to produce date string compliant with JSONResume Schema (padded). Thanks @ [lucbpz](https://github.com/lucbpz).

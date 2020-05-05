@@ -570,100 +570,128 @@ window.LinkedinToResumeJson = (() => {
         });
     };
 
+    LinkedinToResumeJson.prototype.parseViaInternalApiFullProfile = async function parseViaInternalApiFullProfile() {
+        // Get full profile
+        var fullProfileEndpointSuccess = false;
+        const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+        if (fullProfileView && typeof fullProfileView.data === 'object') {
+            // Try to use the same parser that I use for embedded
+            const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
+            if (profileParserResult) {
+                apiSuccessCount++;
+                fullProfileEndpointSuccess = true;
+                if (this.debug) {
+                    console.log('parseViaInternalApi = true');
+                }
+            }
+            if (this.debug) {
+                console.log(_outputJson);
+            }
+        }
+        return fullProfileEndpointSuccess;
+    }
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiFullSkills = async function parseViaInternalApiFullSkills() {
+        // Get full skills, behind voyager endpoint
+        if (this.getFullSkills) {
+            const fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
+            if (fullSkillsInfo && typeof fullSkillsInfo.data === 'object') {
+                apiSuccessCount++;
+                if (Array.isArray(fullSkillsInfo.included)) {
+                    for (let x = 0; x < fullSkillsInfo.included.length; x++) {
+                        const skillObj = fullSkillsInfo.included[x];
+                        if (typeof skillObj.name === 'string') {
+                            pushSkill(skillObj.name);
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiContactInfo = async function parseViaInternalApiContactInfo() {
+        // Always get full contact info, behind voyager endpoint
+        const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
+        if (contactInfo && typeof contactInfo.data === 'object') {
+            const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
+            _outputJson.basics.location.address = noNullOrUndef(contactInfo.data.address, _outputJson.basics.location.address);
+            _outputJson.basics.email = noNullOrUndef(emailAddress, _outputJson.basics.email);
+            if (phoneNumbers && phoneNumbers.length) {
+                _outputJson.basics.phone = noNullOrUndef(phoneNumbers[0].number);
+            }
+
+            // Scrape Websites
+            if (Array.isArray(websites)) {
+                for (let x = 0; x < websites.length; x++) {
+                    if (/portfolio/i.test(websites[x].type.category)) {
+                        _outputJson.basics.website = websites[x].url;
+                    }
+                }
+            }
+
+            // Scrape Twitter
+            if (Array.isArray(twitterHandles)) {
+                twitterHandles.forEach((handleMeta) => {
+                    const handle = handleMeta.name;
+                    _outputJson.basics.profiles.push({
+                        network: 'Twitter',
+                        username: handle,
+                        url: `https://twitter.com/${handle}`
+                    });
+                });
+            }
+
+            apiSuccessCount++;
+            return true;
+        }
+        return false;
+    }
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiBasicAboutMe = async function parseViaInternalApiBasicAboutMe() {
+        const basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
+        if (basicAboutMe && typeof basicAboutMe.data === 'object') {
+            if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {
+                const data = basicAboutMe.included[0];
+                _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
+                // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
+                _outputJson.basics.label = data.occupation;
+                _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
+            }
+            apiSuccessCount++;
+            return true;
+        }
+        return false;
+    }
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiAdvancedAboutMe = async function parseViaInternalApiAdvancedAboutMe() {
+        const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
+        if (advancedAboutMe && typeof advancedAboutMe.data === 'object') {
+            const { data } = advancedAboutMe;
+            _outputJson.basics.name = `${data.firstName} ${data.lastName}`;
+            _outputJson.basics.label = data.headline;
+            _outputJson.basics.summary = data.summary;
+            apiSuccessCount++;
+            return true;
+        }
+        return false;
+    }
+
+    // Outsourced all own parsing to own functions
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
         try {
             let apiSuccessCount = 0;
             let fullProfileEndpointSuccess = false;
 
-            // Get full profile
-            const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
-            if (fullProfileView && typeof fullProfileView.data === 'object') {
-                // Try to use the same parser that I use for embedded
-                const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
-                if (profileParserResult) {
-                    apiSuccessCount++;
-                    fullProfileEndpointSuccess = true;
-                    if (this.debug) {
-                        console.log('parseViaInternalApi = true');
-                    }
-                }
-                if (this.debug) {
-                    console.log(_outputJson);
-                }
-            }
-
-            // Get full skills, behind voyager endpoint
-            if (this.getFullSkills) {
-                const fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
-                if (fullSkillsInfo && typeof fullSkillsInfo.data === 'object') {
-                    apiSuccessCount++;
-                    if (Array.isArray(fullSkillsInfo.included)) {
-                        for (let x = 0; x < fullSkillsInfo.included.length; x++) {
-                            const skillObj = fullSkillsInfo.included[x];
-                            if (typeof skillObj.name === 'string') {
-                                pushSkill(skillObj.name);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Always get full contact info, behind voyager endpoint
-            const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-            if (contactInfo && typeof contactInfo.data === 'object') {
-                const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
-                _outputJson.basics.location.address = noNullOrUndef(contactInfo.data.address, _outputJson.basics.location.address);
-                _outputJson.basics.email = noNullOrUndef(emailAddress, _outputJson.basics.email);
-                if (phoneNumbers && phoneNumbers.length) {
-                    _outputJson.basics.phone = noNullOrUndef(phoneNumbers[0].number);
-                }
-
-                // Scrape Websites
-                if (Array.isArray(websites)) {
-                    for (let x = 0; x < websites.length; x++) {
-                        if (/portfolio/i.test(websites[x].type.category)) {
-                            _outputJson.basics.website = websites[x].url;
-                        }
-                    }
-                }
-
-                // Scrape Twitter
-                if (Array.isArray(twitterHandles)) {
-                    twitterHandles.forEach((handleMeta) => {
-                        const handle = handleMeta.name;
-                        _outputJson.basics.profiles.push({
-                            network: 'Twitter',
-                            username: handle,
-                            url: `https://twitter.com/${handle}`
-                        });
-                    });
-                }
-
-                apiSuccessCount++;
-            }
+            fullProfileEndpointSuccess = await this.parseViaInternalApiFullProfile();
+            await this.parseViaInternalApiFullSkills();
+            await this.parseViaInternalApiContactInfo();
 
             // Only continue with other endpoints if full profile API failed
             if (!fullProfileEndpointSuccess) {
-                const basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
-                if (basicAboutMe && typeof basicAboutMe.data === 'object') {
-                    if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {
-                        const data = basicAboutMe.included[0];
-                        _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
-                        // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
-                        _outputJson.basics.label = data.occupation;
-                        _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
-                    }
-                    apiSuccessCount++;
-                }
-
-                const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
-                if (advancedAboutMe && typeof advancedAboutMe.data === 'object') {
-                    const { data } = advancedAboutMe;
-                    _outputJson.basics.name = `${data.firstName} ${data.lastName}`;
-                    _outputJson.basics.label = data.headline;
-                    _outputJson.basics.summary = data.summary;
-                    apiSuccessCount++;
-                }
+                await this.parseViaInternalApiBasicAboutMe();
+                await this.parseViaInternalApiAdvancedAboutMe();
             }
 
             if (this.debug) {

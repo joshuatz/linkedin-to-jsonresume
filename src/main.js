@@ -589,7 +589,7 @@ window.LinkedinToResumeJson = (() => {
             }
         }
         return fullProfileEndpointSuccess;
-    }
+    };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiFullSkills = async function parseViaInternalApiFullSkills() {
         // Get full skills, behind voyager endpoint
@@ -609,7 +609,7 @@ window.LinkedinToResumeJson = (() => {
             }
         }
         return false;
-    }
+    };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiContactInfo = async function parseViaInternalApiContactInfo() {
         // Always get full contact info, behind voyager endpoint
@@ -647,7 +647,7 @@ window.LinkedinToResumeJson = (() => {
             return true;
         }
         return false;
-    }
+    };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiBasicAboutMe = async function parseViaInternalApiBasicAboutMe() {
         const basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
@@ -663,7 +663,7 @@ window.LinkedinToResumeJson = (() => {
             return true;
         }
         return false;
-    }
+    };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiAdvancedAboutMe = async function parseViaInternalApiAdvancedAboutMe() {
         const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
@@ -676,7 +676,7 @@ window.LinkedinToResumeJson = (() => {
             return true;
         }
         return false;
-    }
+    };
 
     // Outsourced all own parsing to own functions
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {

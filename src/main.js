@@ -578,7 +578,6 @@ window.LinkedinToResumeJson = (() => {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult) {
-                    fullProfileEndpointSuccess = true;
                     if (this.debug) {
                         console.log('parseViaInternalApi = true');
                     }
@@ -597,20 +596,17 @@ window.LinkedinToResumeJson = (() => {
 
     LinkedinToResumeJson.prototype.parseViaInternalApiFullSkills = async function parseViaInternalApiFullSkills() {
         try {
-            // Get full skills, behind voyager endpoint
-            if (this.getFullSkills) {
-                const fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
-                if (fullSkillsInfo && typeof fullSkillsInfo.data === 'object') {
-                    if (Array.isArray(fullSkillsInfo.included)) {
-                        for (let x = 0; x < fullSkillsInfo.included.length; x++) {
-                            const skillObj = fullSkillsInfo.included[x];
-                            if (typeof skillObj.name === 'string') {
-                                pushSkill(skillObj.name);
-                            }
+            const fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
+            if (fullSkillsInfo && typeof fullSkillsInfo.data === 'object') {
+                if (Array.isArray(fullSkillsInfo.included)) {
+                    for (let x = 0; x < fullSkillsInfo.included.length; x++) {
+                        const skillObj = fullSkillsInfo.included[x];
+                        if (typeof skillObj.name === 'string') {
+                            pushSkill(skillObj.name);
                         }
                     }
-                    return true;
                 }
+                return true;
             }
         } catch (e) {
             console.warn(e);
@@ -621,7 +617,6 @@ window.LinkedinToResumeJson = (() => {
 
     LinkedinToResumeJson.prototype.parseViaInternalApiContactInfo = async function parseViaInternalApiContactInfo() {
         try {
-            // Always get full contact info, behind voyager endpoint
             const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
             if (contactInfo && typeof contactInfo.data === 'object') {
                 const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
@@ -658,7 +653,7 @@ window.LinkedinToResumeJson = (() => {
             console.log('Error parsing using internal API (Voyager) - Contact Info');
         }
         return false;
-    }
+    };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiBasicAboutMe = async function parseViaInternalApiBasicAboutMe() {
         try {
@@ -678,7 +673,7 @@ window.LinkedinToResumeJson = (() => {
             console.log('Error parsing using internal API (Voyager) - Basic About Me');
         }
         return false;
-    }
+    };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiAdvancedAboutMe = async function parseViaInternalApiAdvancedAboutMe() {
         try {
@@ -697,29 +692,32 @@ window.LinkedinToResumeJson = (() => {
         return false;
     };
 
-    // Outsourced all own parsing to own functions
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
         try {
             let apiSuccessCount = 0;
             let fullProfileEndpointSuccess = false;
 
             fullProfileEndpointSuccess = await this.parseViaInternalApiFullProfile();
-            if(fullProfileEndpointSuccess){
+            if (fullProfileEndpointSuccess) {
                 apiSuccessCount++;
             }
-            if((await this.parseViaInternalApiFullSkills())){
+
+            // Get full skills, behind voyager endpoint
+            if (this.getFullSkills && (await this.parseViaInternalApiFullSkills())) {
                 apiSuccessCount++;
             }
-            if((await this.parseViaInternalApiContactInfo())){
+
+            // Always get full contact info, behind voyager endpoint
+            if (await this.parseViaInternalApiContactInfo()) {
                 apiSuccessCount++;
             }
 
             // Only continue with other endpoints if full profile API failed
             if (!fullProfileEndpointSuccess) {
-                if((await this.parseViaInternalApiBasicAboutMe())){
+                if (await this.parseViaInternalApiBasicAboutMe()) {
                     apiSuccessCount++;
                 }
-                if((await this.parseViaInternalApiAdvancedAboutMe())){
+                if (await this.parseViaInternalApiAdvancedAboutMe()) {
                     apiSuccessCount++;
                 }
             }

@@ -570,19 +570,14 @@ window.LinkedinToResumeJson = (() => {
         });
     };
 
-    LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
+    LinkedinToResumeJson.prototype.parseViaInternalApiFullProfile = async function parseViaInternalApiFullProfile() {
         try {
-            let apiSuccessCount = 0;
-            let fullProfileEndpointSuccess = false;
-
             // Get full profile
             const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
             if (fullProfileView && typeof fullProfileView.data === 'object') {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult) {
-                    apiSuccessCount++;
-                    fullProfileEndpointSuccess = true;
                     if (this.debug) {
                         console.log('parseViaInternalApi = true');
                     }
@@ -590,25 +585,38 @@ window.LinkedinToResumeJson = (() => {
                 if (this.debug) {
                     console.log(_outputJson);
                 }
+                return true;
             }
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - FullProfile');
+        }
+        return false;
+    };
 
-            // Get full skills, behind voyager endpoint
-            if (this.getFullSkills) {
-                const fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
-                if (fullSkillsInfo && typeof fullSkillsInfo.data === 'object') {
-                    apiSuccessCount++;
-                    if (Array.isArray(fullSkillsInfo.included)) {
-                        for (let x = 0; x < fullSkillsInfo.included.length; x++) {
-                            const skillObj = fullSkillsInfo.included[x];
-                            if (typeof skillObj.name === 'string') {
-                                pushSkill(skillObj.name);
-                            }
+    LinkedinToResumeJson.prototype.parseViaInternalApiFullSkills = async function parseViaInternalApiFullSkills() {
+        try {
+            const fullSkillsInfo = await this.voyagerFetch(_voyagerEndpoints.fullSkills);
+            if (fullSkillsInfo && typeof fullSkillsInfo.data === 'object') {
+                if (Array.isArray(fullSkillsInfo.included)) {
+                    for (let x = 0; x < fullSkillsInfo.included.length; x++) {
+                        const skillObj = fullSkillsInfo.included[x];
+                        if (typeof skillObj.name === 'string') {
+                            pushSkill(skillObj.name);
                         }
                     }
                 }
+                return true;
             }
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - FullSkills');
+        }
+        return false;
+    };
 
-            // Always get full contact info, behind voyager endpoint
+    LinkedinToResumeJson.prototype.parseViaInternalApiContactInfo = async function parseViaInternalApiContactInfo() {
+        try {
             const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
             if (contactInfo && typeof contactInfo.data === 'object') {
                 const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
@@ -638,30 +646,78 @@ window.LinkedinToResumeJson = (() => {
                         });
                     });
                 }
+                return true;
+            }
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - Contact Info');
+        }
+        return false;
+    };
 
+    LinkedinToResumeJson.prototype.parseViaInternalApiBasicAboutMe = async function parseViaInternalApiBasicAboutMe() {
+        try {
+            const basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
+            if (basicAboutMe && typeof basicAboutMe.data === 'object') {
+                if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {
+                    const data = basicAboutMe.included[0];
+                    _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
+                    // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
+                    _outputJson.basics.label = data.occupation;
+                    _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
+                }
+                return true;
+            }
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - Basic About Me');
+        }
+        return false;
+    };
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiAdvancedAboutMe = async function parseViaInternalApiAdvancedAboutMe() {
+        try {
+            const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
+            if (advancedAboutMe && typeof advancedAboutMe.data === 'object') {
+                const { data } = advancedAboutMe;
+                _outputJson.basics.name = `${data.firstName} ${data.lastName}`;
+                _outputJson.basics.label = data.headline;
+                _outputJson.basics.summary = data.summary;
+                return true;
+            }
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - AdvancedAboutMe');
+        }
+        return false;
+    };
+
+    LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
+        try {
+            let apiSuccessCount = 0;
+            let fullProfileEndpointSuccess = false;
+
+            fullProfileEndpointSuccess = await this.parseViaInternalApiFullProfile();
+            if (fullProfileEndpointSuccess) {
+                apiSuccessCount++;
+            }
+
+            // Get full skills, behind voyager endpoint
+            if (this.getFullSkills && (await this.parseViaInternalApiFullSkills())) {
+                apiSuccessCount++;
+            }
+
+            // Always get full contact info, behind voyager endpoint
+            if (await this.parseViaInternalApiContactInfo()) {
                 apiSuccessCount++;
             }
 
             // Only continue with other endpoints if full profile API failed
             if (!fullProfileEndpointSuccess) {
-                const basicAboutMe = await this.voyagerFetch(_voyagerEndpoints.basicAboutMe);
-                if (basicAboutMe && typeof basicAboutMe.data === 'object') {
-                    if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {
-                        const data = basicAboutMe.included[0];
-                        _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
-                        // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
-                        _outputJson.basics.label = data.occupation;
-                        _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
-                    }
+                if (await this.parseViaInternalApiBasicAboutMe()) {
                     apiSuccessCount++;
                 }
-
-                const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
-                if (advancedAboutMe && typeof advancedAboutMe.data === 'object') {
-                    const { data } = advancedAboutMe;
-                    _outputJson.basics.name = `${data.firstName} ${data.lastName}`;
-                    _outputJson.basics.label = data.headline;
-                    _outputJson.basics.summary = data.summary;
+                if (await this.parseViaInternalApiAdvancedAboutMe()) {
                     apiSuccessCount++;
                 }
             }

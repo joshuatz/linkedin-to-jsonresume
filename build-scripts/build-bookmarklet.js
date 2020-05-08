@@ -4,9 +4,9 @@ const fse = require('fs-extra');
 const childProc = require('child_process');
 
 // Paths
-const buildFolder = './build-bookmarklet/';
+const buildFolder = `${__dirname}/../build-bookmarklet/`;
 const installFileHtml = `${buildFolder}install-page.html`;
-const srcFolder = './src/';
+const srcFolder = `${__dirname}/../src/`;
 
 // Copy src to build and then append some JS that will auto-execute when ran
 fse.copyFileSync(`${srcFolder}main.js`, `${buildFolder}main.js`);

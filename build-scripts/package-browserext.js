@@ -5,9 +5,9 @@ const fse = require('fs-extra');
 const archiver = require('archiver');
 
 // Get version info
-const versionString = require('./package.json').version.toString();
+const versionString = require('../package.json').version.toString();
 
-const output = fse.createWriteStream(`./webstore-zips/build_${versionString}.zip`);
+const output = fse.createWriteStream(`${__dirname}/../webstore-zips/build_${versionString}.zip`);
 const archive = archiver('zip', {
     zlib: { level: 6 } // compression level
 });
@@ -27,7 +27,7 @@ archive.on('error', (err) => {
 archive.pipe(output);
 
 // append files from a directory
-archive.directory('./build-browserext/', '');
+archive.directory(`${__dirname}/../build-browserext/`, '');
 
 // finalize the archive (ie we are done appending files but streams have to finish yet)
 archive.finalize();

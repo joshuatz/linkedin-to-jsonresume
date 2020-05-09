@@ -402,13 +402,30 @@ window.LinkedinToResumeJson = (() => {
                 _outputJson.volunteer.push(parsedVolunteerWork);
             });
 
-            // Parse certificates
-            // Not currently used by JsonResume
-            /*
-            db.getValuesByKey(_liSchemaKeys.certificates).forEach(function(cert){
-                //
-            });
-            */
+            /**
+             * Parse certificates
+             *  - NOTE: This is not currently supported by the official JSON Resume spec,
+             * so this is hidden behind the exportBeyondSpec setting / flag.
+             *  - Once JSON Resume adds a certificate section to the offical specs,
+             * this should be moved out and made automatic
+             * @see https://github.com/jsonresume/resume-schema/pull/340
+             */
+            if (_this.exportBeyondSpec) {
+                _outputJson.certificates = [];
+                db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
+                    const certObj = {
+                        title: cert.name,
+                        issuer: cert.authority
+                    };
+                    if (typeof cert.timePeriod === 'object' && cert.timePeriod.startDate) {
+                        certObj.date = parseDate(cert.timePeriod.startDate);
+                    }
+                    if (typeof cert.url === 'string' && cert.url) {
+                        certObj.url = cert.url;
+                    }
+                    _outputJson.certificates.push(certObj);
+                });
+            }
 
             // Parse skills
             const skillArr = [];

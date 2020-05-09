@@ -119,7 +119,8 @@ window.LinkedinToResumeJson = (() => {
         basicAboutMe: '/me',
         advancedAboutMe: '/identity/profiles/{profileId}',
         fullProfileView: '/identity/profiles/{profileId}/profileView',
-        fullSkills: '/identity/profiles/{profileId}/skillCategory'
+        fullSkills: '/identity/profiles/{profileId}/skillCategory',
+        recommendations: '/identity/profiles/{profileId}/recommendations'
     };
     let _scrolledToLoad = false;
     const _toolPrefix = 'jtzLiToResumeJson';
@@ -135,6 +136,10 @@ window.LinkedinToResumeJson = (() => {
         return typeof value === 'undefined' || value === null ? defaultVal : value;
     }
 
+    /**
+     * Builds a mini-db out of a LI schema obj
+     * @param {LiResponse} schemaJson
+     */
     function buildDbFromLiSchema(schemaJson) {
         const template = {
             tableOfContents: {},
@@ -155,6 +160,28 @@ window.LinkedinToResumeJson = (() => {
             currRow.key = currRow.entityUrn;
             db.data[currRow.entityUrn] = currRow;
         }
+        delete db.tableOfContents['included'];
+        /**
+         * Get list of element keys (if applicable)
+         *  - Certain LI responses will contain a list of keys that correspond to
+         * entities via an URN mapping. I think these are in cases where the response
+         * is returning a mix of entities, both directly related to the inquiry and
+         * tangentially (e.g. `book` entities and `author` entities, return in the
+         * same response). In this case, `elements` are those that directly satisfy
+         *  the request, and the other items in `included` are those related
+         * @returns {string[]}
+         */
+        db.getElementKeys = function getElementKeys() {
+            let foundKeys = [];
+            ['*elements', 'elements'].forEach((key) => {
+                const matchingArr = db.tableOfContents[key];
+                if (Array.isArray(matchingArr)) {
+                    foundKeys = matchingArr;
+                }
+                return false;
+            });
+            return foundKeys;
+        };
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
@@ -398,35 +425,6 @@ window.LinkedinToResumeJson = (() => {
                 pushSkill(skillName);
             });
 
-            // Parse recommendations
-            const recommendationHashes = [];
-            document.querySelectorAll('.pv-recommendations-section artdeco-tabpanel.active li').forEach((elem) => {
-                if (elem.querySelector('blockquote span[class*="line-clamp"]')) {
-                    // Click the see more button
-                    const recommendationSeeMoreButton = elem.querySelector('blockquote span.lt-line-clamp__ellipsis a');
-                    if (recommendationSeeMoreButton) {
-                        recommendationSeeMoreButton.click();
-                    }
-                    const textArray = [];
-                    elem.querySelectorAll('blockquote span[class*="line-clamp"]').forEach((textElem) => textArray.push(textElem.innerText));
-
-                    const rawRefData = {
-                        name: elem.querySelector('h3').innerText,
-                        title: elem.querySelector('p[class*="headline"]').innerText,
-                        text: textArray.join(' ')
-                    };
-                    const hash = `${rawRefData.name}|${rawRefData.title}`;
-
-                    if (!recommendationHashes.includes(hash)) {
-                        recommendationHashes.push(hash);
-                        _outputJson.references.push({
-                            name: rawRefData.name,
-                            reference: rawRefData.text
-                        });
-                    }
-                }
-            });
-
             // Parse projects
             // Not currently used by Resume JSON
             if (_this.exportBeyondSpec) {
@@ -500,6 +498,7 @@ window.LinkedinToResumeJson = (() => {
 
     // Constructor
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
+        this.profileId = this.getProfileId();
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
@@ -692,6 +691,29 @@ window.LinkedinToResumeJson = (() => {
         return false;
     };
 
+    LinkedinToResumeJson.prototype.parseViaInternalApiRecommendations = async function parseViaInternalApiRecommendations() {
+        try {
+            const recommendationJson = await this.voyagerFetch(`${_voyagerEndpoints.recommendations}?q=received&recommendationStatuses=List(VISIBLE)`);
+            // This endpoint return a LI db
+            const db = buildDbFromLiSchema(recommendationJson);
+            db.getElementKeys().forEach((key) => {
+                const elem = db.data[key];
+                if (elem && 'recommendationText' in elem) {
+                    // Need to do a secondary lookup to get the name of the person who gave the recommendation
+                    const recommenderElem = db.data[elem['*recommender']];
+                    _outputJson.references.push({
+                        name: `${recommenderElem.firstName} ${recommenderElem.lastName}`,
+                        reference: elem.recommendationText
+                    });
+                }
+            });
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - Recommendations');
+        }
+        return false;
+    };
+
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
         try {
             let apiSuccessCount = 0;
@@ -709,6 +731,11 @@ window.LinkedinToResumeJson = (() => {
 
             // Always get full contact info, behind voyager endpoint
             if (await this.parseViaInternalApiContactInfo()) {
+                apiSuccessCount++;
+            }
+
+            // References / recommendations should also come via voyager; DOM is extremely unreliable for this
+            if (await this.parseViaInternalApiRecommendations()) {
                 apiSuccessCount++;
             }
 
@@ -972,7 +999,7 @@ window.LinkedinToResumeJson = (() => {
         if (!endpoint.startsWith('https')) {
             endpoint = _voyagerBase + endpoint;
         }
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             // Get the csrf token - should be stored as a cookie
             const csrfTokenString = getCookie('JSESSIONID').replace(/"/g, '');
             if (csrfTokenString) {
@@ -994,16 +1021,17 @@ window.LinkedinToResumeJson = (() => {
                 }
                 fetch(endpoint, fetchOptions).then((response) => {
                     if (response.status !== 200) {
-                        resolve(false);
-                        console.warn('Error fetching internal API endpoint');
+                        const errStr = 'Error fetching internal API endpoint';
+                        reject(new Error(errStr));
+                        console.warn(errStr, response);
                     } else {
                         response.text().then((text) => {
                             try {
                                 const parsed = JSON.parse(text);
                                 resolve(parsed);
                             } catch (e) {
-                                console.warn('Error parsing internal API response');
-                                resolve(false);
+                                console.warn('Error parsing internal API response', response, e);
+                                reject(e);
                             }
                         });
                     }

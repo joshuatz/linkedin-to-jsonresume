@@ -338,10 +338,7 @@ window.LinkedinToResumeJson = (() => {
                         if (courseInfo) {
                             parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
                         } else {
-                            if (_this.debug) {
-                                console.warn('could not find course:');
-                                console.warn(courseKey);
-                            }
+                            _this.debugConsole.warn('could not find course:', courseKey);
                         }
                     });
                 }
@@ -515,6 +512,7 @@ window.LinkedinToResumeJson = (() => {
 
     // Constructor
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
+        const _this = this;
         this.profileId = this.getProfileId();
         this.scannedPageUrl = '';
         this.parseSuccess = false;
@@ -525,13 +523,24 @@ window.LinkedinToResumeJson = (() => {
         if (this.debug) {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
         }
+        this.debugConsole = {
+            log: (...args) => {
+                if (_this.debug) {
+                    console.log.apply(null, args);
+                }
+            },
+            warn: (...args) => {
+                if (_this.debug) {
+                    console.warn.apply(null, args);
+                }
+            },
+            error: (...args) => {
+                if (_this.debug) {
+                    console.error.apply(null, args);
+                }
+            }
+        };
     }
-
-    LinkedinToResumeJson.prototype.setExportBeyondSpec = function setExportBeyondSpec(setting) {
-        if (typeof setting === 'boolean') {
-            this.exportBeyondSpec = setting;
-        }
-    };
 
     LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = function parseEmbeddedLiSchema() {
         const _this = this;
@@ -550,13 +559,9 @@ window.LinkedinToResumeJson = (() => {
                         doneWithBlockIterator = true;
                         foundSomeSchema = true;
                         const profileParserResult = parseProfileSchemaJSON(_this, embeddedJson);
-                        if (_this.debug) {
-                            console.log(`Parse from embedded schema, success = ${profileParserResult}`);
-                        }
+                        _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
                     } else {
-                        if (_this.debug) {
-                            console.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
-                        }
+                        _this.debugConsole.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
                     }
                 } catch (e) {
                     if (_this.debug) {
@@ -571,8 +576,8 @@ window.LinkedinToResumeJson = (() => {
                 break;
             }
         }
-        if (!foundSomeSchema && _this.debug) {
-            console.warn('Failed to find any embedded schema blocks!');
+        if (!foundSomeSchema) {
+            _this.debugConsole.warn('Failed to find any embedded schema blocks!');
         }
     };
 
@@ -594,13 +599,9 @@ window.LinkedinToResumeJson = (() => {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult) {
-                    if (this.debug) {
-                        console.log('parseViaInternalApi = true');
-                    }
+                    this.debugConsole.log('Was able to parse full profile via internal API');
                 }
-                if (this.debug) {
-                    console.log(_outputJson);
-                }
+                this.debugConsole.log(_outputJson);
                 return true;
             }
         } catch (e) {
@@ -766,15 +767,11 @@ window.LinkedinToResumeJson = (() => {
                 }
             }
 
-            if (this.debug) {
-                console.log(_outputJson);
-            }
+            this.debugConsole.log(_outputJson);
             if (apiSuccessCount > 0) {
                 this.parseSuccess = true;
             } else {
-                if (this.debug) {
-                    console.error('Using internal API (Voyager) failed completely!');
-                }
+                this.debugConsole.error('Using internal API (Voyager) failed completely!');
             }
         } catch (e) {
             console.warn(e);
@@ -1033,9 +1030,7 @@ window.LinkedinToResumeJson = (() => {
                     method: 'GET',
                     mode: 'cors'
                 };
-                if (_this.debug) {
-                    console.log(`Fetching: ${endpoint}`);
-                }
+                _this.debugConsole.log(`Fetching: ${endpoint}`);
                 fetch(endpoint, fetchOptions).then((response) => {
                     if (response.status !== 200) {
                         const errStr = 'Error fetching internal API endpoint';

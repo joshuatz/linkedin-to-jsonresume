@@ -119,7 +119,8 @@ window.LinkedinToResumeJson = (() => {
         basicAboutMe: '/me',
         advancedAboutMe: '/identity/profiles/{profileId}',
         fullProfileView: '/identity/profiles/{profileId}/profileView',
-        fullSkills: '/identity/profiles/{profileId}/skillCategory'
+        fullSkills: '/identity/profiles/{profileId}/skillCategory',
+        recommendations: '/identity/profiles/{profileId}/recommendations'
     };
     let _scrolledToLoad = false;
     const _toolPrefix = 'jtzLiToResumeJson';
@@ -135,6 +136,10 @@ window.LinkedinToResumeJson = (() => {
         return typeof value === 'undefined' || value === null ? defaultVal : value;
     }
 
+    /**
+     * Builds a mini-db out of a LI schema obj
+     * @param {LiResponse} schemaJson
+     */
     function buildDbFromLiSchema(schemaJson) {
         const template = {
             tableOfContents: {},
@@ -155,6 +160,28 @@ window.LinkedinToResumeJson = (() => {
             currRow.key = currRow.entityUrn;
             db.data[currRow.entityUrn] = currRow;
         }
+        delete db.tableOfContents['included'];
+        /**
+         * Get list of element keys (if applicable)
+         *  - Certain LI responses will contain a list of keys that correspond to
+         * entities via an URN mapping. I think these are in cases where the response
+         * is returning a mix of entities, both directly related to the inquiry and
+         * tangentially (e.g. `book` entities and `author` entities, return in the
+         * same response). In this case, `elements` are those that directly satisfy
+         *  the request, and the other items in `included` are those related
+         * @returns {string[]}
+         */
+        db.getElementKeys = function getElementKeys() {
+            let foundKeys = [];
+            ['*elements', 'elements'].forEach((key) => {
+                const matchingArr = db.tableOfContents[key];
+                if (Array.isArray(matchingArr)) {
+                    foundKeys = matchingArr;
+                }
+                return false;
+            });
+            return foundKeys;
+        };
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
@@ -311,10 +338,7 @@ window.LinkedinToResumeJson = (() => {
                         if (courseInfo) {
                             parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
                         } else {
-                            if (_this.debug) {
-                                console.warn('could not find course:');
-                                console.warn(courseKey);
-                            }
+                            _this.debugConsole.warn('could not find course:', courseKey);
                         }
                     });
                 }
@@ -375,13 +399,30 @@ window.LinkedinToResumeJson = (() => {
                 _outputJson.volunteer.push(parsedVolunteerWork);
             });
 
-            // Parse certificates
-            // Not currently used by JsonResume
-            /*
-            db.getValuesByKey(_liSchemaKeys.certificates).forEach(function(cert){
-                //
-            });
-            */
+            /**
+             * Parse certificates
+             *  - NOTE: This is not currently supported by the official JSON Resume spec,
+             * so this is hidden behind the exportBeyondSpec setting / flag.
+             *  - Once JSON Resume adds a certificate section to the offical specs,
+             * this should be moved out and made automatic
+             * @see https://github.com/jsonresume/resume-schema/pull/340
+             */
+            if (_this.exportBeyondSpec) {
+                _outputJson.certificates = [];
+                db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
+                    const certObj = {
+                        title: cert.name,
+                        issuer: cert.authority
+                    };
+                    if (typeof cert.timePeriod === 'object' && cert.timePeriod.startDate) {
+                        certObj.date = parseDate(cert.timePeriod.startDate);
+                    }
+                    if (typeof cert.url === 'string' && cert.url) {
+                        certObj.url = cert.url;
+                    }
+                    _outputJson.certificates.push(certObj);
+                });
+            }
 
             // Parse skills
             const skillArr = [];
@@ -396,35 +437,6 @@ window.LinkedinToResumeJson = (() => {
             });
             skillArr.forEach((skillName) => {
                 pushSkill(skillName);
-            });
-
-            // Parse recommendations
-            const recommendationHashes = [];
-            document.querySelectorAll('.pv-recommendations-section artdeco-tabpanel.active li').forEach((elem) => {
-                if (elem.querySelector('blockquote span[class*="line-clamp"]')) {
-                    // Click the see more button
-                    const recommendationSeeMoreButton = elem.querySelector('blockquote span.lt-line-clamp__ellipsis a');
-                    if (recommendationSeeMoreButton) {
-                        recommendationSeeMoreButton.click();
-                    }
-                    const textArray = [];
-                    elem.querySelectorAll('blockquote span[class*="line-clamp"]').forEach((textElem) => textArray.push(textElem.innerText));
-
-                    const rawRefData = {
-                        name: elem.querySelector('h3').innerText,
-                        title: elem.querySelector('p[class*="headline"]').innerText,
-                        text: textArray.join(' ')
-                    };
-                    const hash = `${rawRefData.name}|${rawRefData.title}`;
-
-                    if (!recommendationHashes.includes(hash)) {
-                        recommendationHashes.push(hash);
-                        _outputJson.references.push({
-                            name: rawRefData.name,
-                            reference: rawRefData.text
-                        });
-                    }
-                }
             });
 
             // Parse projects
@@ -500,6 +512,8 @@ window.LinkedinToResumeJson = (() => {
 
     // Constructor
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
+        const _this = this;
+        this.profileId = this.getProfileId();
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
@@ -509,13 +523,24 @@ window.LinkedinToResumeJson = (() => {
         if (this.debug) {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
         }
+        this.debugConsole = {
+            log: (...args) => {
+                if (_this.debug) {
+                    console.log.apply(null, args);
+                }
+            },
+            warn: (...args) => {
+                if (_this.debug) {
+                    console.warn.apply(null, args);
+                }
+            },
+            error: (...args) => {
+                if (_this.debug) {
+                    console.error.apply(null, args);
+                }
+            }
+        };
     }
-
-    LinkedinToResumeJson.prototype.setExportBeyondSpec = function setExportBeyondSpec(setting) {
-        if (typeof setting === 'boolean') {
-            this.exportBeyondSpec = setting;
-        }
-    };
 
     LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = function parseEmbeddedLiSchema() {
         const _this = this;
@@ -534,13 +559,9 @@ window.LinkedinToResumeJson = (() => {
                         doneWithBlockIterator = true;
                         foundSomeSchema = true;
                         const profileParserResult = parseProfileSchemaJSON(_this, embeddedJson);
-                        if (_this.debug) {
-                            console.log(`Parse from embedded schema, success = ${profileParserResult}`);
-                        }
+                        _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
                     } else {
-                        if (_this.debug) {
-                            console.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
-                        }
+                        _this.debugConsole.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
                     }
                 } catch (e) {
                     if (_this.debug) {
@@ -555,8 +576,8 @@ window.LinkedinToResumeJson = (() => {
                 break;
             }
         }
-        if (!foundSomeSchema && _this.debug) {
-            console.warn('Failed to find any embedded schema blocks!');
+        if (!foundSomeSchema) {
+            _this.debugConsole.warn('Failed to find any embedded schema blocks!');
         }
     };
 
@@ -578,13 +599,9 @@ window.LinkedinToResumeJson = (() => {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult) {
-                    if (this.debug) {
-                        console.log('parseViaInternalApi = true');
-                    }
+                    this.debugConsole.log('Was able to parse full profile via internal API');
                 }
-                if (this.debug) {
-                    console.log(_outputJson);
-                }
+                this.debugConsole.log(_outputJson);
                 return true;
             }
         } catch (e) {
@@ -692,6 +709,29 @@ window.LinkedinToResumeJson = (() => {
         return false;
     };
 
+    LinkedinToResumeJson.prototype.parseViaInternalApiRecommendations = async function parseViaInternalApiRecommendations() {
+        try {
+            const recommendationJson = await this.voyagerFetch(`${_voyagerEndpoints.recommendations}?q=received&recommendationStatuses=List(VISIBLE)`);
+            // This endpoint return a LI db
+            const db = buildDbFromLiSchema(recommendationJson);
+            db.getElementKeys().forEach((key) => {
+                const elem = db.data[key];
+                if (elem && 'recommendationText' in elem) {
+                    // Need to do a secondary lookup to get the name of the person who gave the recommendation
+                    const recommenderElem = db.data[elem['*recommender']];
+                    _outputJson.references.push({
+                        name: `${recommenderElem.firstName} ${recommenderElem.lastName}`,
+                        reference: elem.recommendationText
+                    });
+                }
+            });
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - Recommendations');
+        }
+        return false;
+    };
+
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
         try {
             let apiSuccessCount = 0;
@@ -712,6 +752,11 @@ window.LinkedinToResumeJson = (() => {
                 apiSuccessCount++;
             }
 
+            // References / recommendations should also come via voyager; DOM is extremely unreliable for this
+            if (await this.parseViaInternalApiRecommendations()) {
+                apiSuccessCount++;
+            }
+
             // Only continue with other endpoints if full profile API failed
             if (!fullProfileEndpointSuccess) {
                 if (await this.parseViaInternalApiBasicAboutMe()) {
@@ -722,15 +767,11 @@ window.LinkedinToResumeJson = (() => {
                 }
             }
 
-            if (this.debug) {
-                console.log(_outputJson);
-            }
+            this.debugConsole.log(_outputJson);
             if (apiSuccessCount > 0) {
                 this.parseSuccess = true;
             } else {
-                if (this.debug) {
-                    console.error('Using internal API (Voyager) failed completely!');
-                }
+                this.debugConsole.error('Using internal API (Voyager) failed completely!');
             }
         } catch (e) {
             console.warn(e);
@@ -972,7 +1013,7 @@ window.LinkedinToResumeJson = (() => {
         if (!endpoint.startsWith('https')) {
             endpoint = _voyagerBase + endpoint;
         }
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             // Get the csrf token - should be stored as a cookie
             const csrfTokenString = getCookie('JSESSIONID').replace(/"/g, '');
             if (csrfTokenString) {
@@ -989,21 +1030,20 @@ window.LinkedinToResumeJson = (() => {
                     method: 'GET',
                     mode: 'cors'
                 };
-                if (_this.debug) {
-                    console.log(`Fetching: ${endpoint}`);
-                }
+                _this.debugConsole.log(`Fetching: ${endpoint}`);
                 fetch(endpoint, fetchOptions).then((response) => {
                     if (response.status !== 200) {
-                        resolve(false);
-                        console.warn('Error fetching internal API endpoint');
+                        const errStr = 'Error fetching internal API endpoint';
+                        reject(new Error(errStr));
+                        console.warn(errStr, response);
                     } else {
                         response.text().then((text) => {
                             try {
                                 const parsed = JSON.parse(text);
                                 resolve(parsed);
                             } catch (e) {
-                                console.warn('Error parsing internal API response');
-                                resolve(false);
+                                console.warn('Error parsing internal API response', response, e);
+                                reject(e);
                             }
                         });
                     }

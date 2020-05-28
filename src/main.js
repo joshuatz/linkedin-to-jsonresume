@@ -39,6 +39,7 @@ const resumeJsonTemplate = {
     references: []
 };
 
+// @ts-ignore
 window.LinkedinToResumeJson = (() => {
     // private
     const maxDaysOfMonth = {
@@ -156,6 +157,7 @@ window.LinkedinToResumeJson = (() => {
         const db = template;
         db.tableOfContents = schemaJson.data;
         for (let x = 0; x < schemaJson.included.length; x++) {
+            /** @type {LiEntity & {key?: string}} */
             const currRow = schemaJson.included[x];
             currRow.key = currRow.entityUrn;
             db.data[currRow.entityUrn] = currRow;
@@ -430,6 +432,7 @@ window.LinkedinToResumeJson = (() => {
                 skillArr.push(skill.name);
             });
             document.querySelectorAll('span[class*="skill-category-entity"][class*="name"]').forEach((skillNameElem) => {
+                // @ts-ignore
                 const skillName = skillNameElem.innerText;
                 if (!skillArr.includes(skillName)) {
                     skillArr.push(skillName);
@@ -885,6 +888,7 @@ window.LinkedinToResumeJson = (() => {
             // Add event listeners
             modalWrapper.addEventListener('click', (evt) => {
                 // Check if click was on modal content, or wrapper (outside content, to trigger close)
+                // @ts-ignore
                 if (evt.target.id === modalWrapperId) {
                     _this.closeModal();
                 }
@@ -892,13 +896,16 @@ window.LinkedinToResumeJson = (() => {
             modalWrapper.querySelector(`.${_toolPrefix}_closeButton`).addEventListener('click', () => {
                 _this.closeModal();
             });
+            /** @type {HTMLTextAreaElement} */
             const textarea = modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`);
             textarea.addEventListener('click', () => {
                 textarea.select();
             });
         }
         // Actually set textarea text
-        modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`).value = JSON.stringify(jsonResume, null, 2);
+        /** @type {HTMLTextAreaElement} */
+        const outputTextArea = modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`);
+        outputTextArea.value = JSON.stringify(jsonResume, null, 2);
     };
 
     LinkedinToResumeJson.prototype.injectStyles = function injectStyles() {
@@ -1005,8 +1012,10 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Special - Fetch with authenticated internal API
+     * @param {string} fetchEndpoint
+     * @param {Record<string, string | number>} [optHeaders]
      */
-    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint) {
+    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint, optHeaders = {}) {
         const _this = this;
         // Macro support
         let endpoint = fetchEndpoint.replace('{profileId}', this.profileId);
@@ -1017,9 +1026,11 @@ window.LinkedinToResumeJson = (() => {
             // Get the csrf token - should be stored as a cookie
             const csrfTokenString = getCookie('JSESSIONID').replace(/"/g, '');
             if (csrfTokenString) {
+                /** @type {RequestInit} */
                 const fetchOptions = {
                     credentials: 'include',
                     headers: {
+                        ...optHeaders,
                         accept: 'application/vnd.linkedin.normalized+json+2.1',
                         'csrf-token': csrfTokenString,
                         'sec-fetch-mode': 'cors',

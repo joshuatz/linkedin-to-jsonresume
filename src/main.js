@@ -197,7 +197,7 @@ window.LinkedinToResumeJson = (() => {
             }
             return [];
         };
-        db.getValuesByKey = (key, optTocValModifier) => {
+        db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
             if (typeof optTocValModifier === 'function') {
@@ -554,6 +554,8 @@ window.LinkedinToResumeJson = (() => {
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
         const _this = this;
         this.profileId = this.getProfileId();
+        /** @type {LiResponse} */
+        this.profileObj = {};
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
@@ -592,6 +594,7 @@ window.LinkedinToResumeJson = (() => {
         const possibleBlocks = document.querySelectorAll('code[id^="bpr-guid-"]');
         for (let x = 0; x < possibleBlocks.length; x++) {
             const currSchemaBlock = possibleBlocks[x];
+            // Check if current schema block matches profileView
             if (/educationView/.test(currSchemaBlock.innerHTML) && /positionView/.test(currSchemaBlock.innerHTML)) {
                 try {
                     const embeddedJson = JSON.parse(currSchemaBlock.innerHTML);
@@ -603,6 +606,9 @@ window.LinkedinToResumeJson = (() => {
                         foundSomeSchema = true;
                         const profileParserResult = parseProfileSchemaJSON(_this, embeddedJson);
                         _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
+                        if (profileParserResult) {
+                            this.profileObj = embeddedJson;
+                        }
                     } else {
                         _this.debugConsole.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
                     }
@@ -642,6 +648,7 @@ window.LinkedinToResumeJson = (() => {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult) {
+                    this.profileObj = fullProfileView;
                     this.debugConsole.log('Was able to parse full profile via internal API');
                 }
                 this.debugConsole.log(_outputJson);
@@ -862,10 +869,17 @@ window.LinkedinToResumeJson = (() => {
         const _this = this;
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve) => {
-            if (_this.parseSuccess && _this.scannedPageUrl !== _this.getUrlWithoutQuery()) {
-                // Parse already done, but page changed (ajax)
-                await _this.forceReParse();
-                resolve(true);
+            if (_this.parseSuccess) {
+                if (_this.scannedPageUrl === _this.getUrlWithoutQuery()) {
+                    // No need to reparse!
+                    this.debugConsole.log('Skipped re-parse; page has not changed');
+                    resolve(true);
+                } else {
+                    // Parse already done, but page changed (ajax)
+                    this.debugConsole.warn('Re-parsing for new results; page has changed between scans');
+                    await _this.forceReParse();
+                    resolve(true);
+                }
             } else {
                 _this.triggerAjaxLoadByScrolling(async () => {
                     _this.parseBasics();
@@ -1066,11 +1080,21 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     * Get the locales that the *current* profile supports (based on `supportedLocales`)
-     * @returns {string | null}
+     * Get the locales that the *current* profile (natively) supports (based on `supportedLocales`)
+     * @returns {Promise<string[]>}
      */
-    LinkedinToResumeJson.prototype.getSupportedLocales = () => {
-        return null;
+    LinkedinToResumeJson.prototype.getSupportedLocales = async function getSupportedLocales() {
+        /** @type {string[]} */
+        let supportedLocales = [];
+        await this.tryParse();
+        const profileDb = buildDbFromLiSchema(this.profileObj);
+        const userDetails = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
+        if (userDetails && Array.isArray(userDetails['supportedLocales'])) {
+            supportedLocales = userDetails.supportedLocales.map((locale) => {
+                return `${locale.language}_${locale.country}`;
+            });
+        }
+        return supportedLocales;
     };
 
     /**

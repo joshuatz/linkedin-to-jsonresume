@@ -7,5 +7,10 @@
     ],
     "compilerOptions": {
         "checkJs": true,
+        "noEmit": true,
+        "noImplicitReturns": true,
+        "alwaysStrict": true,
+        "declaration": false,
+        "noImplicitAny": true,
     }
 }

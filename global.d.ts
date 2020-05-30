@@ -2,6 +2,8 @@ interface GenObj {
     [k: string]: any;
 }
 
+type LiUrn = string;
+
 interface LiResponse {
     data: {
         $type: string;
@@ -24,5 +26,25 @@ interface LiPaging {
 
 interface LiEntity {
     $type: string;
-    entityUrn: string;
+    entityUrn: LiUrn;
+    [key: string]: any;
+}
+
+interface LiSupportedLocale {
+    country: string;
+    language: string;
+    $type: string;
+}
+
+type TocValModifier = (tocVal: string | string[]) => string | string[];
+
+interface InternalDb {
+    tableOfContents: LiResponse['data'];
+    data: {
+        [k: LiUrn]: LiEntity & {key: LiUrn}
+        [k: string]: LiEntity & {key: LiUrn};
+    }
+    // Methods
+    getElementKeys: () => string[];
+    getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[]; 
 }

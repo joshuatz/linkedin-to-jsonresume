@@ -5,19 +5,25 @@
  * WARNING: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
  */
 
+/**
+ * @typedef {import("../jsonresume.schema").ResumeSchema & Partial<import('../jsonresume.schema.beyond').ResumeSchemaBeyondCurrentSpec>} ResumeSchema
+ */
+
 // ==Bookmarklet==
 // @name linkedin-to-jsonresume-bookmarklet
 // @author Joshua Tzucker
 // ==/Bookmarklet==
 
+/** @type {ResumeSchema} */
 const resumeJsonTemplate = {
+    awards: [],
     basics: {
         name: '',
         label: '',
-        picture: '',
+        image: '',
         email: '',
         phone: '',
-        website: '',
+        url: '',
         summary: '',
         location: {
             address: '',
@@ -28,19 +34,21 @@ const resumeJsonTemplate = {
         },
         profiles: []
     },
-    work: [],
-    volunteer: [],
     education: [],
-    awards: [],
-    publications: [],
-    skills: [],
-    languages: [],
     interests: [],
-    references: []
+    languages: [],
+    projects: [],
+    publications: [],
+    references: [],
+    skills: [],
+    volunteer: [],
+    work: []
 };
 
+// @ts-ignore
 window.LinkedinToResumeJson = (() => {
     // private
+    /** @type {{[key: number]: number}} */
     const maxDaysOfMonth = {
         1: 31,
         2: 28,
@@ -64,7 +72,7 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Returns month. If it is only one digit, adds a 0 and returns it as a string.
-     * @param {Number} m month
+     * @param {Number} [m] month
      */
     const getMonth = (m) => {
         if (!m) return 12;
@@ -93,7 +101,7 @@ window.LinkedinToResumeJson = (() => {
     /**
      * Parses an object with year, month and day and returns a string with the date.
      * If month is not present, should return 12, and if day is not present, should return last month day.
-     * @param {{year, month, day}} dateObj
+     * @param {{year: number, month?: number, day?: number}} dateObj
      */
     const parseDate = (dateObj) => (dateObj && dateObj.year ? `${dateObj.year}-${getMonth(dateObj.month)}-${getDay(dateObj.day, dateObj.month)}` : '');
 
@@ -126,11 +134,20 @@ window.LinkedinToResumeJson = (() => {
     const _toolPrefix = 'jtzLiToResumeJson';
     const _stylesInjected = false;
 
+    /**
+     * Get a cookie by name
+     * @param {string} name
+     */
     function getCookie(name) {
         const v = document.cookie.match(`(^|;) ?${name}=([^;]*)(;|$)`);
         return v ? v[2] : null;
     }
 
+    /**
+     * Replace a value with a default if it is null or undefined
+     * @param {any} value
+     * @param {any} [optDefaultVal]
+     */
     function noNullOrUndef(value, optDefaultVal) {
         const defaultVal = optDefaultVal || '';
         return typeof value === 'undefined' || value === null ? defaultVal : value;
@@ -139,25 +156,22 @@ window.LinkedinToResumeJson = (() => {
     /**
      * Builds a mini-db out of a LI schema obj
      * @param {LiResponse} schemaJson
+     * @returns {InternalDb}
      */
     function buildDbFromLiSchema(schemaJson) {
+        /** @type {Partial<InternalDb> & Pick<InternalDb, 'data'>} */
         const template = {
-            tableOfContents: {},
-            data: {
-                /*
-                key : {
-                    key : '',
-                    $type : '',
-                    ...
-                }
-                */
-            }
+            /** @type {InternalDb['data']} */
+            data: {}
         };
         const db = template;
         db.tableOfContents = schemaJson.data;
         for (let x = 0; x < schemaJson.included.length; x++) {
-            const currRow = schemaJson.included[x];
-            currRow.key = currRow.entityUrn;
+            /** @type {LiEntity & {key: string}} */
+            const currRow = {
+                key: schemaJson.included[x].entityUrn,
+                ...schemaJson.included[x]
+            };
             db.data[currRow.entityUrn] = currRow;
         }
         delete db.tableOfContents['included'];
@@ -172,17 +186,18 @@ window.LinkedinToResumeJson = (() => {
          * @returns {string[]}
          */
         db.getElementKeys = function getElementKeys() {
-            let foundKeys = [];
-            ['*elements', 'elements'].forEach((key) => {
+            /** @type {string[]} */
+            const searchKeys = ['*elements', 'elements'];
+            for (let x = 0; x < searchKeys.length; x++) {
+                const key = searchKeys[x];
                 const matchingArr = db.tableOfContents[key];
                 if (Array.isArray(matchingArr)) {
-                    foundKeys = matchingArr;
+                    return matchingArr;
                 }
-                return false;
-            });
-            return foundKeys;
+            }
+            return [];
         };
-        db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
+        db.getValuesByKey = (key, optTocValModifier) => {
             const values = [];
             let tocVal = this.tableOfContents[key];
             if (typeof optTocValModifier === 'function') {
@@ -216,14 +231,17 @@ window.LinkedinToResumeJson = (() => {
             }
             return values;
         };
+        // @ts-ignore
         return db;
     }
 
     /**
      * Gets the profile ID from embedded (or api returned) Li JSON Schema
+     * @param {LiResponse} jsonSchema
+     * @returns {string} profileId
      */
     function getProfileIdFromLiSchema(jsonSchema) {
-        let profileId = false;
+        let profileId = '';
         // miniprofile is not usually in the TOC, nor does its entry have an entityUrn for looking up (it has objectUrn), so best solution is just to iterate through all entries checking for match.
         if (jsonSchema.included && Array.isArray(jsonSchema.included)) {
             for (let x = 0; x < jsonSchema.included.length; x++) {
@@ -237,6 +255,10 @@ window.LinkedinToResumeJson = (() => {
         return profileId.toString();
     }
 
+    /**
+     * Push a new skill to the resume object
+     * @param {string} skillName
+     */
     function pushSkill(skillName) {
         // Try to prevent duplicate skills
         const skillNames = _outputJson.skills.map((skill) => skill.name);
@@ -249,6 +271,11 @@ window.LinkedinToResumeJson = (() => {
         }
     }
 
+    /**
+     *
+     * @param {any} instance
+     * @param {LiResponse} json
+     */
     function parseProfileSchemaJSON(instance, json) {
         let profileParseSuccess = false;
         const _this = instance;
@@ -297,7 +324,7 @@ window.LinkedinToResumeJson = (() => {
                 // Since most people put potfolio as first link, guess that it will be
                 if (!captured && !foundPortfolio) {
                     captured = true;
-                    _outputJson.basics.website = url;
+                    _outputJson.basics.url = url;
                 }
                 // Finally, put in projects if not yet categorized
                 if (!captured && _this.exportBeyondSpec) {
@@ -306,7 +333,8 @@ window.LinkedinToResumeJson = (() => {
                     _outputJson.projects.push({
                         name: attachment.title,
                         startDate: '',
-                        summary: attachment.description,
+                        endDate: '',
+                        description: attachment.description,
                         url
                     });
                 }
@@ -314,6 +342,7 @@ window.LinkedinToResumeJson = (() => {
 
             // Parse education
             db.getValuesByKey(_liSchemaKeys.education).forEach((edu) => {
+                /** @type {ResumeSchema['education'][0]} */
                 const parsedEdu = {
                     institution: noNullOrUndef(edu.schoolName),
                     area: noNullOrUndef(edu.fieldOfStudy),
@@ -348,14 +377,15 @@ window.LinkedinToResumeJson = (() => {
 
             // Parse work
             db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
+                /** @type {ResumeSchema['work'][0]} */
                 const parsedWork = {
-                    company: position.companyName,
+                    name: position.companyName,
                     endDate: '',
                     highlights: [],
                     position: position.title,
                     startDate: '',
                     summary: position.description,
-                    website: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
+                    url: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
                 };
                 if (position.timePeriod && typeof position.timePeriod === 'object') {
                     if (position.timePeriod.endDate && typeof position.timePeriod.endDate === 'object') {
@@ -377,10 +407,11 @@ window.LinkedinToResumeJson = (() => {
 
             // Parse volunteer experience
             db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach((volunteering) => {
+                /** @type {ResumeSchema['volunteer'][0]} */
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
                     position: volunteering.role,
-                    website: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                    url: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
                     startDate: '',
                     endDate: '',
                     summary: volunteering.description,
@@ -410,6 +441,7 @@ window.LinkedinToResumeJson = (() => {
             if (_this.exportBeyondSpec) {
                 _outputJson.certificates = [];
                 db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
+                    /** @type {ResumeSchema['certificates'][0]} */
                     const certObj = {
                         title: cert.name,
                         issuer: cert.authority
@@ -425,11 +457,13 @@ window.LinkedinToResumeJson = (() => {
             }
 
             // Parse skills
+            /** @type {string[]} */
             const skillArr = [];
             db.getValuesByKey(_liSchemaKeys.skills).forEach((skill) => {
                 skillArr.push(skill.name);
             });
             document.querySelectorAll('span[class*="skill-category-entity"][class*="name"]').forEach((skillNameElem) => {
+                // @ts-ignore
                 const skillName = skillNameElem.innerText;
                 if (!skillArr.includes(skillName)) {
                     skillArr.push(skillName);
@@ -510,7 +544,13 @@ window.LinkedinToResumeJson = (() => {
         return profileParseSuccess;
     }
 
-    // Constructor
+    /**
+     *
+     * @param {boolean} [OPT_exportBeyondSpec] - Should the tool export additioanl details, beyond the official JSONResume specifications?
+     * @param {boolean} [OPT_debug] - Debug Mode?
+     * @param {boolean} [OPT_preferApi] - Prefer Voyager API, rather than DOM scrape?
+     * @param {boolean} [OPT_getFullSkills] - Retrieve full skills (behind additional API endpoint), rather than just basics
+     */
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
         const _this = this;
         this.profileId = this.getProfileId();
@@ -524,16 +564,19 @@ window.LinkedinToResumeJson = (() => {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
         }
         this.debugConsole = {
+            /** @type {(...args: any[]) => void} */
             log: (...args) => {
                 if (_this.debug) {
                     console.log.apply(null, args);
                 }
             },
+            /** @type {(...args: any[]) => void} */
             warn: (...args) => {
                 if (_this.debug) {
                     console.warn.apply(null, args);
                 }
             },
+            /** @type {(...args: any[]) => void} */
             error: (...args) => {
                 if (_this.debug) {
                     console.error.apply(null, args);
@@ -647,7 +690,7 @@ window.LinkedinToResumeJson = (() => {
                 if (Array.isArray(websites)) {
                     for (let x = 0; x < websites.length; x++) {
                         if (/portfolio/i.test(websites[x].type.category)) {
-                            _outputJson.basics.website = websites[x].url;
+                            _outputJson.basics.url = websites[x].url;
                         }
                     }
                 }
@@ -681,7 +724,7 @@ window.LinkedinToResumeJson = (() => {
                     _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
                     // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
                     _outputJson.basics.label = data.occupation;
-                    _outputJson.basics.picture = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
+                    _outputJson.basics.image = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
                 }
                 return true;
             }
@@ -779,6 +822,10 @@ window.LinkedinToResumeJson = (() => {
         }
     };
 
+    /**
+     * Trigger AJAX loading of content by scrolling
+     * @param {() => any} [callback]
+     */
     LinkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function triggerAjaxLoadByScrolling(callback) {
         const cb = typeof callback === 'function' ? callback : () => {};
         if (!_scrolledToLoad) {
@@ -862,6 +909,10 @@ window.LinkedinToResumeJson = (() => {
         }
     };
 
+    /**
+     * Show the output modal with the results
+     * @param {{[key: string]: any}} jsonResume - JSON Resume
+     */
     LinkedinToResumeJson.prototype.showModal = function showModal(jsonResume) {
         const _this = this;
         const modalWrapperId = `${_toolPrefix}_modalWrapper`;
@@ -885,6 +936,7 @@ window.LinkedinToResumeJson = (() => {
             // Add event listeners
             modalWrapper.addEventListener('click', (evt) => {
                 // Check if click was on modal content, or wrapper (outside content, to trigger close)
+                // @ts-ignore
                 if (evt.target.id === modalWrapperId) {
                     _this.closeModal();
                 }
@@ -892,13 +944,16 @@ window.LinkedinToResumeJson = (() => {
             modalWrapper.querySelector(`.${_toolPrefix}_closeButton`).addEventListener('click', () => {
                 _this.closeModal();
             });
+            /** @type {HTMLTextAreaElement} */
             const textarea = modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`);
             textarea.addEventListener('click', () => {
                 textarea.select();
             });
         }
         // Actually set textarea text
-        modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`).value = JSON.stringify(jsonResume, null, 2);
+        /** @type {HTMLTextAreaElement} */
+        const outputTextArea = modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`);
+        outputTextArea.value = JSON.stringify(jsonResume, null, 2);
     };
 
     LinkedinToResumeJson.prototype.injectStyles = function injectStyles() {
@@ -992,6 +1047,36 @@ window.LinkedinToResumeJson = (() => {
         return false;
     };
 
+    /**
+     * Get the local language identifier of the *viewer* (not profile)
+     * @returns {string}
+     */
+    LinkedinToResumeJson.prototype.getViewersLocalLang = () => {
+        const metaTag = document.querySelector('meta[name="i18nDefaultLocale"]');
+        /** @type {HTMLSelectElement | null} */
+        const selectTag = document.querySelector('select#globalfooter-select_language');
+        if (metaTag) {
+            return metaTag.getAttribute('content');
+        }
+        if (selectTag) {
+            return selectTag.value;
+        }
+        // Default to English
+        return 'en_US';
+    };
+
+    /**
+     * Get the locales that the *current* profile supports (based on `supportedLocales`)
+     * @returns {string | null}
+     */
+    LinkedinToResumeJson.prototype.getSupportedLocales = () => {
+        return null;
+    };
+
+    /**
+     * Retrieve a LI Company Page URL from a company URN
+     * @param {string} companyUrn
+     */
     LinkedinToResumeJson.prototype.companyLiPageFromCompanyUrn = function companyLiPageFromCompanyUrn(companyUrn) {
         let companyPageUrl = '';
         if (typeof companyUrn === 'string') {
@@ -1005,8 +1090,10 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Special - Fetch with authenticated internal API
+     * @param {string} fetchEndpoint
+     * @param {Record<string, string | number>} [optHeaders]
      */
-    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint) {
+    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint, optHeaders = {}) {
         const _this = this;
         // Macro support
         let endpoint = fetchEndpoint.replace('{profileId}', this.profileId);
@@ -1017,9 +1104,11 @@ window.LinkedinToResumeJson = (() => {
             // Get the csrf token - should be stored as a cookie
             const csrfTokenString = getCookie('JSESSIONID').replace(/"/g, '');
             if (csrfTokenString) {
+                /** @type {RequestInit} */
                 const fetchOptions = {
                     credentials: 'include',
                     headers: {
+                        ...optHeaders,
                         accept: 'application/vnd.linkedin.normalized+json+2.1',
                         'csrf-token': csrfTokenString,
                         'sec-fetch-mode': 'cors',

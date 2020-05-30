@@ -1,3 +1,16 @@
 {
-    "exclude": ["node_modules"]
+    "exclude": [
+        "node_modules",
+        "build",
+        "build-bookmarklet",
+        "build-browserext"
+    ],
+    "compilerOptions": {
+        "checkJs": true,
+        "noEmit": true,
+        "noImplicitReturns": true,
+        "alwaysStrict": true,
+        "declaration": false,
+        "noImplicitAny": true,
+    }
 }

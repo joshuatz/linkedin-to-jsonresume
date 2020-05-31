@@ -556,6 +556,10 @@ window.LinkedinToResumeJson = (() => {
         this.profileId = this.getProfileId();
         /** @type {LiResponse} */
         this.profileObj = {};
+        /** @type {string | null} */
+        this.lastScannedLocale = null;
+        /** @type {string | null} */
+        this.preferLocale = null;
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
@@ -859,31 +863,44 @@ window.LinkedinToResumeJson = (() => {
         return true;
     };
 
-    LinkedinToResumeJson.prototype.forceReParse = async function forceReParse() {
+    /**
+     * Force a re-parse / scrape
+     * @param {string} [optLocale]
+     */
+    LinkedinToResumeJson.prototype.forceReParse = async function forceReParse(optLocale) {
         _scrolledToLoad = false;
         this.parseSuccess = false;
-        await this.tryParse();
+        await this.tryParse(optLocale);
     };
 
-    LinkedinToResumeJson.prototype.tryParse = async function tryParse() {
+    /**
+     * Try to scrape / get API and parse
+     * @param {string} [optLocale]
+     */
+    LinkedinToResumeJson.prototype.tryParse = async function tryParse(optLocale) {
         const _this = this;
+        const localeToUse = optLocale || _this.preferLocale;
+        const localeStayedSame = !localeToUse || optLocale === _this.lastScannedLocale;
+        const localeMatchesUser = !localeToUse || optLocale === _this.getViewersLocalLang();
+        _this.preferLocale = localeToUse || null;
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve) => {
             if (_this.parseSuccess) {
-                if (_this.scannedPageUrl === _this.getUrlWithoutQuery()) {
+                if (_this.scannedPageUrl === _this.getUrlWithoutQuery() && localeStayedSame) {
                     // No need to reparse!
                     this.debugConsole.log('Skipped re-parse; page has not changed');
                     resolve(true);
                 } else {
                     // Parse already done, but page changed (ajax)
                     this.debugConsole.warn('Re-parsing for new results; page has changed between scans');
-                    await _this.forceReParse();
+                    await _this.forceReParse(localeToUse);
                     resolve(true);
                 }
             } else {
                 _this.triggerAjaxLoadByScrolling(async () => {
                     _this.parseBasics();
-                    if (_this.preferApi === false) {
+                    // Embedded schema can't be used for specific locales
+                    if (_this.preferApi === false && localeMatchesUser) {
                         _this.parseEmbeddedLiSchema();
                         if (!_this.parseSuccess) {
                             await _this.parseViaInternalApi();
@@ -1124,6 +1141,14 @@ window.LinkedinToResumeJson = (() => {
         if (!endpoint.startsWith('https')) {
             endpoint = _voyagerBase + endpoint;
         }
+        // Set requested language
+        let langHeaders = {};
+        if (_this.preferLocale) {
+            langHeaders = {
+                'x-li-lang': _this.preferLocale,
+                ...optHeaders
+            };
+        }
         return new Promise((resolve, reject) => {
             // Get the csrf token - should be stored as a cookie
             const csrfTokenString = getCookie('JSESSIONID').replace(/"/g, '');
@@ -1132,6 +1157,7 @@ window.LinkedinToResumeJson = (() => {
                 const fetchOptions = {
                     credentials: 'include',
                     headers: {
+                        ...langHeaders,
                         ...optHeaders,
                         accept: 'application/vnd.linkedin.normalized+json+2.1',
                         'csrf-token': csrfTokenString,
@@ -1143,7 +1169,7 @@ window.LinkedinToResumeJson = (() => {
                     method: 'GET',
                     mode: 'cors'
                 };
-                _this.debugConsole.log(`Fetching: ${endpoint}`);
+                _this.debugConsole.log(`Fetching: ${endpoint}`, fetchOptions);
                 fetch(endpoint, fetchOptions).then((response) => {
                     if (response.status !== 200) {
                         const errStr = 'Error fetching internal API endpoint';

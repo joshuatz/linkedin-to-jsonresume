@@ -16,6 +16,7 @@
 
 /** @type {ResumeSchema} */
 const resumeJsonTemplate = {
+    $schema: 'https://json.schemastore.org/resume',
     awards: [],
     basics: {
         name: '',

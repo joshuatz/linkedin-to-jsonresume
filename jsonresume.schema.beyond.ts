@@ -21,5 +21,14 @@ export interface Certificate {
 }
 
 export interface ResumeSchemaBeyondCurrentSpec {
+    /**
+     * $schema is not in schema itself, and blocked
+     * by "additionalProperties": false, but needs to be in
+     * output in order for VSCode to provide auto-intellisense
+     * @see https://github.com/json-schema/json-schema/issues/220
+     * @see https://github.com/DavidAnson/markdownlint/issues/227
+     */
+    $schema: string;
+    // Soon to be added
     certificates: Certificate[];
 }

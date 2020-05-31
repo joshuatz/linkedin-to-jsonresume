@@ -35,6 +35,19 @@ The dropdown should automatically get populated with the languages that the prof
 
 > Note: LinkedIn offers language choices through [a `Locale` string](https://developer.linkedin.com/docs/ref/v2/object-types#LocaleString), which is a combination of `country` (ISO-3166) and `language` (ISO-639). I do not make decisions as to what languages are supported.
 
+### Chrome Side-loading Instructions
+Instead of installing from the Chrome Webstore, you might might want to "side-load" a ZIP build for either local development, or to try out a new release that has not yet made it through the Chrome review process. Here are the instructions for doing so:
+
+1. Find the ZIP you want to load
+     - If you want to side-load the latest version, you can download a ZIP from [the releases tab](https://github.com/joshuatz/linkedin-to-jsonresume/releases/)
+     - If you want to side-load a local build, use `npm run package-browserext` to create a ZIP
+2. Go to Chrome's extension setting page (`chrome://extensions`)
+3. Turn on developer mode (upper right toggle switch)
+4. Drag the downloaded zip to the browser to let it install
+5. Test it out, then uninstall
+
+You can also unpack the ZIP and load it as "unpacked".
+
 ## Troubleshooting
 When in doubt, refresh the profile page before using this tool.
 

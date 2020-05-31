@@ -10,8 +10,18 @@
 </head>
 
 <body>
-    <div class="buttonWrapper">
-        <div id="liToJsonButton" class="mainExportButton">LinkedIn Profile to JSON</div>
+    <div class="fullCenter">
+        <div id="liToJsonButton" class="mainExportButton disabled toggle">LinkedIn Profile to JSON</div>
+    </div>
+    <div class="fullCenter">
+        <div class="langSelectWrapper">
+            <label>
+                Select export language:
+                <select id="langSelect" class="langSelect toggle">
+                    <option value="en_US">en_US</option>
+                </select>
+            </label>
+        </div>
     </div>
     <div class="fullCenter bottomButtonsWrapper">
         <a class="bottomButton" href="https://github.com/joshuatz/linkedin-to-jsonresume" target="_blank"><div class="">Info</div></a>

@@ -17,7 +17,6 @@
 /** @type {ResumeSchema} */
 const resumeJsonTemplate = {
     $schema: 'https://json.schemastore.org/resume',
-    awards: [],
     basics: {
         name: '',
         label: '',
@@ -35,15 +34,16 @@ const resumeJsonTemplate = {
         },
         profiles: []
     },
-    education: [],
-    interests: [],
-    languages: [],
-    projects: [],
-    publications: [],
-    references: [],
-    skills: [],
+    work: [],
     volunteer: [],
-    work: []
+    education: [],
+    awards: [],
+    publications: [],
+    skills: [],
+    languages: [],
+    interests: [],
+    references: [],
+    projects: []
 };
 
 // @ts-ignore
@@ -106,7 +106,8 @@ window.LinkedinToResumeJson = (() => {
      */
     const parseDate = (dateObj) => (dateObj && dateObj.year ? `${dateObj.year}-${getMonth(dateObj.month)}-${getDay(dateObj.day, dateObj.month)}` : '');
 
-    const _outputJson = resumeJsonTemplate;
+    /** @type {ResumeSchema} */
+    let _outputJson = JSON.parse(JSON.stringify(resumeJsonTemplate));
     const _templateJson = resumeJsonTemplate;
     const _liSchemaKeys = {
         profile: '*profile',
@@ -898,6 +899,7 @@ window.LinkedinToResumeJson = (() => {
                     resolve(true);
                 }
             } else {
+                _outputJson = JSON.parse(JSON.stringify(_templateJson));
                 _this.triggerAjaxLoadByScrolling(async () => {
                     _this.parseBasics();
                     // Embedded schema can't be used for specific locales

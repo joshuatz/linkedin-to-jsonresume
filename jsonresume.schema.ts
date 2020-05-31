@@ -343,16 +343,16 @@ export interface Work {
 }
 
 export interface ResumeSchema {
-    awards: Award[],
-    basics: Basics,
-    education: Education[],
-    interests: Interest[],
-    languages: Language[],
-    meta?: Meta,
-    projects: Project[],
-    publications: Publication[],
-    references: Reference[],
-    skills: Skill[],
-    volunteer: Volunteer[],
-    work: Work[]
+    basics: Basics;
+    work: Work[];
+    volunteer: Volunteer[];
+    education: Education[];
+    awards: Award[];
+    publications: Publication[];
+    skills: Skill[];
+    languages: Language[];
+    interests: Interest[];
+    references: Reference[];
+    projects: Project[];
+    meta?: Meta;
 }

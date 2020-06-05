@@ -1,5 +1,6 @@
 const path = require('path');
 
+/** @type {import('webpack').Configuration} */
 module.exports = {
     mode: 'development',
     entry: './src/main.js',
@@ -7,6 +8,7 @@ module.exports = {
         filename: 'main.js',
         path: path.resolve(__dirname, 'build')
     },
+    target: 'web',
     module: {
         rules: [
             {

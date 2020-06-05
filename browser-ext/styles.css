@@ -46,7 +46,7 @@ body {
     background: grey;
     border: black;
 }
-#vcardExportButton {
+.emojiButton {
     padding: 2px 6px 6px 6px;
 }
 .disabled {

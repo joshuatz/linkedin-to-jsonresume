@@ -116,22 +116,21 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 document.getElementById('liToJsonButton').addEventListener('click', () => {
     chrome.tabs.executeScript(
         {
-            file: 'main.js'
+            code: `${runAndShowCode}`
         },
         () => {
-            chrome.tabs.executeScript(
-                {
-                    code: `${runAndShowCode}`
-                },
-                () => {
-                    setTimeout(() => {
-                        // Close popup
-                        window.close();
-                    }, 700);
-                }
-            );
+            setTimeout(() => {
+                // Close popup
+                window.close();
+            }, 700);
         }
     );
+});
+
+document.getElementById('liToJsonDownloadButton').addEventListener('click', () => {
+    chrome.tabs.executeScript({
+        code: `liToJrInstance.parseAndDownload();`
+    });
 });
 
 document.getElementById('langSelect').addEventListener('change', (evt) => {

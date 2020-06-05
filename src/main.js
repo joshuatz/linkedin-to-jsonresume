@@ -950,6 +950,14 @@ window.LinkedinToResumeJson = (() => {
         });
     };
 
+    LinkedinToResumeJson.prototype.parseAndDownload = async function parseAndDownload() {
+        await this.tryParse();
+        const fileName = `${_outputJson.basics.name.replace(/\s/g, '_')}.resume.json`;
+        const fileContents = JSON.stringify(_outputJson, null, 2);
+        this.debugConsole.log(fileContents);
+        promptDownload(fileContents, fileName, 'application/json');
+    };
+
     LinkedinToResumeJson.prototype.parseAndShowOutput = async function parseAndShowOutput() {
         await this.tryParse();
         const parsedExport = {

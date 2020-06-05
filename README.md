@@ -7,17 +7,10 @@
 ![Demo GIF](demo-chrome_extension.gif "Demo Gif")
 
 ## Usage / Installation Options:
-There are a few different options for how to use this:
+There are (or *were*) a few different options for how to use this:
  - **Fast and simple**: Chrome Extension - [Get it here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
      - Feel free to install, use, and then immediately uninstall if you just need a single export
      - No data is collected
- - **Fast, but manual**: Using browser dev console
-     - Step 1: Copy the code from [`main.js`](https://github.com/joshuatz/linkedin-to-jsonresume/blob/master/src/main.js) into your clipboard
-     - Step 2: Navigate to a LinkedIn profile page, then paste the code into your console and run it
-     - Step 3: Copy and run the following code:
-        ```javascript
-        (new LinkedinToResumeJson(false,false)).parseAndShowOutput();
-        ```
  - [***Deprecated***] (at least for now): Bookmarklet
      - This was originally how this tool worked, but had to be retired as a valid method when LinkedIn added a stricter CSP that prevented it from working
      - Code to generate the bookmarklet is still in this repo if LI ever loosens the CSP
@@ -34,6 +27,12 @@ I've implemented support (starting with `v1.0.0`) for multilingual profile expor
 The dropdown should automatically get populated with the languages that the profile you are currently viewing supports, in addition to your own preferred viewing language in the #1 spot. You should be able to switch between languages in the dropdown and click the export button to get a JSON Resume export with your selected language.
 
 > Note: LinkedIn offers language choices through [a `Locale` string](https://developer.linkedin.com/docs/ref/v2/object-types#LocaleString), which is a combination of `country` (ISO-3166) and `language` (ISO-639). I do not make decisions as to what languages are supported.
+
+### Export Options
+There are several main buttons in the browser extension, with different effects. You can hover over each button to see the alt text describing what they do, or read below:
+ - *LinkedIn Profile to JSON*: Converts the profile to the JSON Resume format, and then displays it in a popup modal for easy copying and pasting
+ - *Download JSON Resume Export*: Same as above, but prompts you to download the result as an actual `.json` file.
+ - *Download vCard File*: Export and download the profile as a Virtual Contact File (`.vcf`) (aka *vCard*)
 
 ### Chrome Side-loading Instructions
 Instead of installing from the Chrome Webstore, you might might want to "side-load" a ZIP build for either local development, or to try out a new release that has not yet made it through the Chrome review process. Here are the instructions for doing so:
@@ -56,6 +55,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+6/5/2020 | 1.1.0 | New feature: [vCard](https://en.wikipedia.org/wiki/VCard) export, which you can import into Outlook / Google Contacts / etc.
 5/31/2020 | 1.0.0 | Brought output up to par with "spec", integrated schemas as TS, added support for multilingual profiles, overhauled JSDoc types.<br><br>Definitely a *breaking* change, since the output has changed to mirror schema more closely (biggest change is `website` in several spots has become `url`)
 5/9/2020 | 0.0.9 | Fixed "references", added certificates (behind setting), and formatting tweaks
 4/4/2020 | 0.0.8 | Added version string display to popup

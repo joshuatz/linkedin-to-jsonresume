@@ -11,7 +11,9 @@
 
 <body>
     <div class="fullCenter">
-        <div id="liToJsonButton" class="mainExportButton disabled toggle">LinkedIn Profile to JSON</div>
+        <button id="liToJsonButton" class="mainButton disabled toggle" title="Export profile to JSON Resume">LinkedIn Profile to JSON</button>
+        <button id="liToJsonDownloadButton" class="mainButton emojiButton disabled toggle" title="Download JSON Resume Export">💾</button>
+        <button id="vcardExportButton" class="mainButton emojiButton disabled toggle" title="Download vCard File">📠</button>
     </div>
     <div class="fullCenter">
         <div class="langSelectWrapper">
@@ -24,8 +26,8 @@
         </div>
     </div>
     <div class="fullCenter bottomButtonsWrapper">
-        <a class="bottomButton" href="https://github.com/joshuatz/linkedin-to-jsonresume" target="_blank"><div class="">Info</div></a>
-        <a class="bottomButton" href="https://github.com/joshuatz/linkedin-to-jsonresume/issues/new" target="_blank"><div class="">Report Issue</div></a>
+        <a class="bottomButton" href="https://github.com/joshuatz/linkedin-to-jsonresume" target="_blank" title="Info about the extension. Takes you to Github page."><div>Info</div></a>
+        <a class="bottomButton" href="https://github.com/joshuatz/linkedin-to-jsonresume/issues/new" target="_blank" title="Report an issue or request a feature."><div>Report Issue</div></a>
     </div>
     <div class="fullCenter">
         <span>Version: </span><span id="versionDisplay">{version_string}</span>

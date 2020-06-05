@@ -36,6 +36,26 @@ interface LiSupportedLocale {
     $type: string;
 }
 
+interface LiDate {
+    month?: number;
+    day?: number;
+    year?: number;
+}
+
+interface LiPhoneNum {
+    number: string;
+    type: string;
+}
+
+interface LiWebsite {
+    url: string;
+    type: {
+        $type: string;
+        category: string;
+    }
+    $type: string;
+}
+
 type TocValModifier = (tocVal: string | string[]) => string | string[];
 
 interface InternalDb {
@@ -47,4 +67,22 @@ interface InternalDb {
     // Methods
     getElementKeys: () => string[];
     getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[]; 
+}
+
+interface LiProfileContactInfoResponse extends LiResponse {
+    data: LiResponse['data'] & Partial<LiEntity> & {
+        $type: 'com.linkedin.voyager.identity.profile.ProfileContactInfo';
+        address: string;
+        birthDateOn: LiDate;
+        birthdayVisibilitySetting: any;
+        connectedAt: null | number;
+        emailAddress: null | string;
+        ims: any;
+        interests: any;
+        phoneNumbers: null | LiPhoneNum[];
+        primaryTwitterHandle: null | string;
+        twitterHandles: any[];
+        weChatContactInfo: any;
+        websites: null | LiWebsite[];
+    }
 }

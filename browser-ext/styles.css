@@ -1,8 +1,8 @@
 body {
-    min-width: 350px;
+    min-width: 400px;
     min-height: 100px;
 }
-.mainExportButton {
+.mainButton {
     font-size: 21px;
     -moz-box-shadow:inset 0px 1px 0px 0px #97c4fe;
     -webkit-box-shadow:inset 0px 1px 0px 0px #97c4fe;
@@ -28,7 +28,7 @@ body {
     text-decoration:none;
     text-shadow:0px 1px 0px #1570cd;
 }
-.mainExportButton:hover {
+.mainButton:hover {
     background:-webkit-gradient(linear, left top, left bottom, color-stop(0.05, #1e62d0), color-stop(1, #3d94f6));
     background:-moz-linear-gradient(top, #1e62d0 5%, #3d94f6 100%);
     background:-webkit-linear-gradient(top, #1e62d0 5%, #3d94f6 100%);
@@ -38,13 +38,16 @@ body {
     filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#1e62d0', endColorstr='#3d94f6',GradientType=0);
     background-color:#1e62d0;
 }
-.mainExportButton:active {
+.mainButton:active {
     position:relative;
     top:1px;
 }
-.mainExportButton.disabled {
+.mainButton.disabled {
     background: grey;
     border: black;
+}
+#vcardExportButton {
+    padding: 2px 6px 6px 6px;
 }
 .disabled {
     cursor: not-allowed;

@@ -1,6 +1,6 @@
 {
     "name": "linkedin-to-json-resume-exporter",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Browser tool to grab details from your open LinkedIn profile page and export to JSON Resume Schema",
     "main": "src/main.js",
     "scripts": {
@@ -53,5 +53,8 @@
                 }
             ]
         ]
+    },
+    "dependencies": {
+        "@dan/vcards": "^2.10.0"
     }
 }

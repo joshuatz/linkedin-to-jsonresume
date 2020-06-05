@@ -5,6 +5,8 @@
  * WARNING: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
  */
 
+const VCardsJS = require('@dan/vcards');
+
 /**
  * @typedef {import("../jsonresume.schema").ResumeSchema & Partial<import('../jsonresume.schema.beyond').ResumeSchemaBeyondCurrentSpec>} ResumeSchema
  */
@@ -105,6 +107,33 @@ window.LinkedinToResumeJson = (() => {
      * @param {{year: number, month?: number, day?: number}} dateObj
      */
     const parseDate = (dateObj) => (dateObj && dateObj.year ? `${dateObj.year}-${getMonth(dateObj.month)}-${getDay(dateObj.day, dateObj.month)}` : '');
+
+    /**
+     * Trigger a file download prompt with given content
+     * @see https://davidwalsh.name/javascript-download
+     * @param {string} data
+     * @param {string} fileName
+     * @param {string} [type]
+     */
+    const promptDownload = (data, fileName, type = 'text/plain') => {
+        // Create an invisible A element
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        document.body.appendChild(a);
+
+        // Set the HREF to a Blob representation of the data to be downloaded
+        a.href = window.URL.createObjectURL(new Blob([data], { type }));
+
+        // Use download attribute to set set desired file name
+        a.setAttribute('download', fileName);
+
+        // Trigger download by simulating click
+        a.click();
+
+        // Cleanup
+        window.URL.revokeObjectURL(a.href);
+        document.body.removeChild(a);
+    };
 
     /** @type {ResumeSchema} */
     let _outputJson = JSON.parse(JSON.stringify(resumeJsonTemplate));
@@ -1132,6 +1161,59 @@ window.LinkedinToResumeJson = (() => {
         return companyPageUrl;
     };
 
+    LinkedinToResumeJson.prototype.generateVCard = async function generateVCard() {
+        await this.tryParse();
+        const contactInfoObj = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
+        this.exportVCard(this.profileObj, contactInfoObj);
+    };
+
+    /**
+     * @param {LiResponse} profileObj
+     * @param {LiResponse} contactInfoObj
+     */
+    LinkedinToResumeJson.prototype.exportVCard = function exportVCard(profileObj, contactInfoObj) {
+        const vCard = VCardsJS();
+        const profileDb = buildDbFromLiSchema(profileObj);
+        const contactDb = buildDbFromLiSchema(contactInfoObj);
+        // Contact info is stored directly in response; no lookup
+        const contactInfo = /** @type {LiProfileContactInfoResponse['data']} */ (contactDb.tableOfContents);
+        const profile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
+        vCard.formattedName = `${profile.firstName} ${profile.lastName}`;
+        vCard.firstName = profile.firstName;
+        vCard.lastName = profile.lastName;
+        // Geo
+        if ('postalCode' in profile.geoLocation) {
+            // @ts-ignore
+            vCard.homeAddress.postalCode = profile.geoLocation.postalCode;
+        }
+        vCard.email = contactInfo.emailAddress;
+        if (contactInfo.twitterHandles.length) {
+            // @ts-ignore
+            vCard.socialUrls['twitter'] = `https://twitter.com/${contactInfo.twitterHandles[0]}`;
+        }
+        if (contactInfo.phoneNumbers && contactInfo.phoneNumbers.length) {
+            vCard.workPhone = contactInfo.phoneNumbers[0].number;
+        }
+        if (profile.birthDate && 'day' in profile.birthDate) {
+            const birthdayLi = /** @type {LiDate} */ (profile.birthDate);
+            vCard.birthday = new Date(birthdayLi.year, birthdayLi.month, birthdayLi.day);
+        }
+        // Try to get currently employed organization
+        const positions = profileDb.getValuesByKey(_liSchemaKeys.workPositions);
+        if (positions.length) {
+            vCard.organization = positions[0].companyName;
+            vCard.title = positions[0].title;
+        }
+        vCard.url = this.getUrlWithoutQuery();
+        vCard.note = profile.headline;
+        // vCard.socialUrls['facebook'] = '';
+        const fileName = `${profile.firstName}_${profile.lastName}.vcf`;
+        const fileContents = vCard.getFormattedString();
+        this.debugConsole.log('vCard generated', fileContents);
+        promptDownload(fileContents, fileName, 'text/vcard');
+        return vCard;
+    };
+
     /**
      * Special - Fetch with authenticated internal API
      * @param {string} fetchEndpoint
@@ -1148,8 +1230,7 @@ window.LinkedinToResumeJson = (() => {
         let langHeaders = {};
         if (_this.preferLocale) {
             langHeaders = {
-                'x-li-lang': _this.preferLocale,
-                ...optHeaders
+                'x-li-lang': _this.preferLocale
             };
         }
         return new Promise((resolve, reject) => {

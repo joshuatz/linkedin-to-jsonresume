@@ -58,6 +58,12 @@ const loadLangs = (langs) => {
     toggleEnabled(langs.length > 0);
 };
 
+const exportVCard = () => {
+    chrome.tabs.executeScript({
+        code: `liToJrInstance.generateVCard()`
+    });
+};
+
 /**
  * Set the desired export lang on the exporter instance
  * - Use `null` to unset
@@ -131,4 +137,8 @@ document.getElementById('liToJsonButton').addEventListener('click', () => {
 document.getElementById('langSelect').addEventListener('change', (evt) => {
     const updatedLang = /** @type {HTMLSelectElement} */ (evt.target).value;
     setLang(updatedLang);
+});
+
+document.getElementById('vcardExportButton').addEventListener('click', () => {
+    exportVCard();
 });

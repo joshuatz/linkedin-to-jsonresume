@@ -60,13 +60,16 @@ type TocValModifier = (tocVal: string | string[]) => string | string[];
 
 interface InternalDb {
     tableOfContents: LiResponse['data'];
-    data: {
+    entitiesByUrn: {
         [k: LiUrn]: LiEntity & {key: LiUrn}
         [k: string]: LiEntity & {key: LiUrn};
     }
+    entities: Array<LiEntity & {key: LiUrn}>;
     // Methods
     getElementKeys: () => string[];
-    getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[]; 
+    getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[];
+    getElementsByType: (typeStr: string) => LiEntity[];
+    getElementByUrn: (urn: string) => LiEntity | undefined;
 }
 
 interface LiProfileContactInfoResponse extends LiResponse {

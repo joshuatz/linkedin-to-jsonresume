@@ -175,6 +175,35 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Get URL response as base64
+     * @param {string} url - URL to convert
+     * @param {boolean} [omitDeclaration] - remove the `data:...` declaration prefix
+     * @returns {Promise<{dataStr: string, mimeStr: string}>} base64 results
+     */
+    async function urlToBase64(url, omitDeclaration = false) {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const declarationPatt = /^data:([^;]+)[^,]+base64,/i;
+                let dataStr = /** @type {string} */ (reader.result);
+                const mimeStr = dataStr.match(declarationPatt)[1];
+                if (omitDeclaration) {
+                    dataStr = dataStr.replace(declarationPatt, '');
+                }
+
+                resolve({
+                    dataStr,
+                    mimeStr
+                });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    /**
      * Replace a value with a default if it is null or undefined
      * @param {any} value
      * @param {any} [optDefaultVal]
@@ -1187,8 +1216,8 @@ window.LinkedinToResumeJson = (() => {
             if (miniProfile && 'picture' in miniProfile) {
                 const pictureMeta = miniProfile.picture;
                 // @ts-ignore
-                const freshestArtifact = pictureMeta.artifacts.sort((a, b) => b.expiresAt - a.expiresAt)[0];
-                photoUrl = `${pictureMeta.rootUrl}${freshestArtifact.fileIdentifyingUrlPathSegment}`;
+                const smallestArtifact = pictureMeta.artifacts.sort((a, b) => a.width - b.width)[0];
+                photoUrl = `${pictureMeta.rootUrl}${smallestArtifact.fileIdentifyingUrlPathSegment}`;
             }
         }
 
@@ -1266,8 +1295,14 @@ window.LinkedinToResumeJson = (() => {
         // Try to get profile picture
         const photoUrl = await this.getDisplayPhoto();
         if (photoUrl) {
-            // @ts-ignore
-            vCard.photo.attachFromUrl(photoUrl, 'JPEG');
+            try {
+                // Since LI photo URLs are temporary, convert to base64 first
+                const photoDataBase64 = await urlToBase64(photoUrl, true);
+                // @ts-ignore
+                vCard.photo.embedFromString(photoDataBase64.dataStr, photoDataBase64.mimeStr);
+            } catch (e) {
+                this.debugConsole.error(`Failed to convert LI image to base64`, e);
+            }
         }
         const fileName = `${profile.firstName}_${profile.lastName}.vcf`;
         const fileContents = vCard.getFormattedString();

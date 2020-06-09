@@ -785,7 +785,6 @@ window.LinkedinToResumeJson = (() => {
                     _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
                     // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
                     _outputJson.basics.label = data.occupation;
-                    _outputJson.basics.image = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
                 }
                 return true;
             }
@@ -1173,6 +1172,29 @@ window.LinkedinToResumeJson = (() => {
         return supportedLocales;
     };
 
+    LinkedinToResumeJson.prototype.getDisplayPhoto = async function getDisplayPhoto() {
+        let photoUrl = '';
+        /** @type {HTMLImageElement | null} */
+        const photoElem = document.querySelector('[class*="profile"] img[class*="profile-photo"]');
+        if (photoElem) {
+            photoUrl = photoElem.src;
+        } else {
+            // Get via miniProfile entity in full profile db
+            await this.tryParse();
+            const profileDb = buildDbFromLiSchema(this.profileObj);
+            const fullProfile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
+            const miniProfile = profileDb.getElementByUrn(fullProfile['*miniProfile']);
+            if (miniProfile && 'picture' in miniProfile) {
+                const pictureMeta = miniProfile.picture;
+                // @ts-ignore
+                const freshestArtifact = pictureMeta.artifacts.sort((a, b) => b.expiresAt - a.expiresAt)[0];
+                photoUrl = `${pictureMeta.rootUrl}${freshestArtifact.fileIdentifyingUrlPathSegment}`;
+            }
+        }
+
+        return photoUrl;
+    };
+
     /**
      * Retrieve a LI Company Page URL from a company URN
      * @param {string} companyUrn
@@ -1198,7 +1220,7 @@ window.LinkedinToResumeJson = (() => {
      * @param {LiResponse} profileObj
      * @param {LiResponse} contactInfoObj
      */
-    LinkedinToResumeJson.prototype.exportVCard = function exportVCard(profileObj, contactInfoObj) {
+    LinkedinToResumeJson.prototype.exportVCard = async function exportVCard(profileObj, contactInfoObj) {
         const vCard = VCardsJS();
         const profileDb = buildDbFromLiSchema(profileObj);
         const contactDb = buildDbFromLiSchema(contactInfoObj);
@@ -1218,8 +1240,16 @@ window.LinkedinToResumeJson = (() => {
             // @ts-ignore
             vCard.socialUrls['twitter'] = `https://twitter.com/${contactInfo.twitterHandles[0]}`;
         }
-        if (contactInfo.phoneNumbers && contactInfo.phoneNumbers.length) {
-            vCard.workPhone = contactInfo.phoneNumbers[0].number;
+        if (contactInfo.phoneNumbers) {
+            contactInfo.phoneNumbers.forEach((numberObj) => {
+                if (numberObj.type === 'MOBILE') {
+                    vCard.cellPhone = numberObj.number;
+                } else if (numberObj.type === 'WORK') {
+                    vCard.workPhone = numberObj.number;
+                } else {
+                    vCard.homePhone = numberObj.number;
+                }
+            });
         }
         if (profile.birthDate && 'day' in profile.birthDate) {
             const birthdayLi = /** @type {LiDate} */ (profile.birthDate);
@@ -1231,9 +1261,14 @@ window.LinkedinToResumeJson = (() => {
             vCard.organization = positions[0].companyName;
             vCard.title = positions[0].title;
         }
-        vCard.url = this.getUrlWithoutQuery();
+        vCard.workUrl = this.getUrlWithoutQuery();
         vCard.note = profile.headline;
-        // vCard.socialUrls['facebook'] = '';
+        // Try to get profile picture
+        const photoUrl = await this.getDisplayPhoto();
+        if (photoUrl) {
+            // @ts-ignore
+            vCard.photo.attachFromUrl(photoUrl, 'JPEG');
+        }
         const fileName = `${profile.firstName}_${profile.lastName}.vcf`;
         const fileContents = vCard.getFormattedString();
         this.debugConsole.log('vCard generated', fileContents);

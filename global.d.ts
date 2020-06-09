@@ -44,7 +44,7 @@ interface LiDate {
 
 interface LiPhoneNum {
     number: string;
-    type: string;
+    type: 'MOBILE' | 'WORK' | 'HOME' | string;
 }
 
 interface LiWebsite {

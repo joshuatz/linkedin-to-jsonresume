@@ -1213,7 +1213,7 @@ window.LinkedinToResumeJson = (() => {
             const profileDb = buildDbFromLiSchema(this.profileObj);
             const fullProfile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
             const miniProfile = profileDb.getElementByUrn(fullProfile['*miniProfile']);
-            if (miniProfile && 'picture' in miniProfile) {
+            if (miniProfile && !!miniProfile.picture) {
                 const pictureMeta = miniProfile.picture;
                 // @ts-ignore
                 const smallestArtifact = pictureMeta.artifacts.sort((a, b) => a.width - b.width)[0];

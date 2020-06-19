@@ -175,6 +175,35 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Get URL response as base64
+     * @param {string} url - URL to convert
+     * @param {boolean} [omitDeclaration] - remove the `data:...` declaration prefix
+     * @returns {Promise<{dataStr: string, mimeStr: string}>} base64 results
+     */
+    async function urlToBase64(url, omitDeclaration = false) {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const declarationPatt = /^data:([^;]+)[^,]+base64,/i;
+                let dataStr = /** @type {string} */ (reader.result);
+                const mimeStr = dataStr.match(declarationPatt)[1];
+                if (omitDeclaration) {
+                    dataStr = dataStr.replace(declarationPatt, '');
+                }
+
+                resolve({
+                    dataStr,
+                    mimeStr
+                });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    /**
      * Replace a value with a default if it is null or undefined
      * @param {any} value
      * @param {any} [optDefaultVal]
@@ -190,10 +219,12 @@ window.LinkedinToResumeJson = (() => {
      * @returns {InternalDb}
      */
     function buildDbFromLiSchema(schemaJson) {
-        /** @type {Partial<InternalDb> & Pick<InternalDb, 'data'>} */
+        /** @type {Partial<InternalDb> & Pick<InternalDb, 'entitiesByUrn' | 'entities'>} */
         const template = {
-            /** @type {InternalDb['data']} */
-            data: {}
+            /** @type {InternalDb['entitiesByUrn']} */
+            entitiesByUrn: {},
+            /** @type {InternalDb['entities']} */
+            entities: []
         };
         const db = template;
         db.tableOfContents = schemaJson.data;
@@ -203,7 +234,8 @@ window.LinkedinToResumeJson = (() => {
                 key: schemaJson.included[x].entityUrn,
                 ...schemaJson.included[x]
             };
-            db.data[currRow.entityUrn] = currRow;
+            db.entitiesByUrn[currRow.entityUrn] = currRow;
+            db.entities.push(currRow);
         }
         delete db.tableOfContents['included'];
         /**
@@ -228,6 +260,22 @@ window.LinkedinToResumeJson = (() => {
             }
             return [];
         };
+        /**
+         * Get all elements that match type. Should usually just be one
+         * @param {string} typeStr - Type, e.g. `$com.linkedin...`
+         * @returns {LiEntity[]}
+         */
+        db.getElementsByType = function getElementByType(typeStr) {
+            return db.entities.filter((entity) => entity['$type'] === typeStr);
+        };
+        /**
+         * Get an element by URN
+         * @param {string} urn - URN identifier
+         * @returns {LiEntity | undefined}
+         */
+        db.getElementByUrn = function getElementByUrn(urn) {
+            return db.entitiesByUrn[urn];
+        };
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
@@ -242,7 +290,7 @@ window.LinkedinToResumeJson = (() => {
             }
             // String pointing to sub item
             else if (tocVal) {
-                const subToc = this.data[tocVal];
+                const subToc = this.entitiesByUrn[tocVal];
                 // Needs secondary lookup if has elements property with list of keys pointing to other sub items
                 if (subToc['*elements'] && Array.isArray(subToc['*elements'])) {
                     matchingDbIndexs = subToc['*elements'];
@@ -256,8 +304,8 @@ window.LinkedinToResumeJson = (() => {
                 }
             }
             for (let x = 0; x < matchingDbIndexs.length; x++) {
-                if (typeof this.data[matchingDbIndexs[x]] !== 'undefined') {
-                    values.push(this.data[matchingDbIndexs[x]]);
+                if (typeof this.entitiesByUrn[matchingDbIndexs[x]] !== 'undefined') {
+                    values.push(this.entitiesByUrn[matchingDbIndexs[x]]);
                 }
             }
             return values;
@@ -394,7 +442,7 @@ window.LinkedinToResumeJson = (() => {
                 if (Array.isArray(edu.courses)) {
                     // Lookup course names
                     edu.courses.forEach((courseKey) => {
-                        const courseInfo = db.data[courseKey];
+                        const courseInfo = db.entitiesByUrn[courseKey];
                         if (courseInfo) {
                             parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
                         } else {
@@ -766,7 +814,6 @@ window.LinkedinToResumeJson = (() => {
                     _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
                     // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
                     _outputJson.basics.label = data.occupation;
-                    _outputJson.basics.image = data.picture.rootUrl + data.picture.artifacts[data.picture.artifacts.length - 1].fileIdentifyingUrlPathSegment;
                 }
                 return true;
             }
@@ -800,10 +847,10 @@ window.LinkedinToResumeJson = (() => {
             // This endpoint return a LI db
             const db = buildDbFromLiSchema(recommendationJson);
             db.getElementKeys().forEach((key) => {
-                const elem = db.data[key];
+                const elem = db.entitiesByUrn[key];
                 if (elem && 'recommendationText' in elem) {
                     // Need to do a secondary lookup to get the name of the person who gave the recommendation
-                    const recommenderElem = db.data[elem['*recommender']];
+                    const recommenderElem = db.entitiesByUrn[elem['*recommender']];
                     _outputJson.references.push({
                         name: `${recommenderElem.firstName} ${recommenderElem.lastName}`,
                         reference: elem.recommendationText
@@ -1154,6 +1201,29 @@ window.LinkedinToResumeJson = (() => {
         return supportedLocales;
     };
 
+    LinkedinToResumeJson.prototype.getDisplayPhoto = async function getDisplayPhoto() {
+        let photoUrl = '';
+        /** @type {HTMLImageElement | null} */
+        const photoElem = document.querySelector('[class*="profile"] img[class*="profile-photo"]');
+        if (photoElem) {
+            photoUrl = photoElem.src;
+        } else {
+            // Get via miniProfile entity in full profile db
+            await this.tryParse();
+            const profileDb = buildDbFromLiSchema(this.profileObj);
+            const fullProfile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
+            const miniProfile = profileDb.getElementByUrn(fullProfile['*miniProfile']);
+            if (miniProfile && !!miniProfile.picture) {
+                const pictureMeta = miniProfile.picture;
+                // @ts-ignore
+                const smallestArtifact = pictureMeta.artifacts.sort((a, b) => a.width - b.width)[0];
+                photoUrl = `${pictureMeta.rootUrl}${smallestArtifact.fileIdentifyingUrlPathSegment}`;
+            }
+        }
+
+        return photoUrl;
+    };
+
     /**
      * Retrieve a LI Company Page URL from a company URN
      * @param {string} companyUrn
@@ -1179,7 +1249,7 @@ window.LinkedinToResumeJson = (() => {
      * @param {LiResponse} profileObj
      * @param {LiResponse} contactInfoObj
      */
-    LinkedinToResumeJson.prototype.exportVCard = function exportVCard(profileObj, contactInfoObj) {
+    LinkedinToResumeJson.prototype.exportVCard = async function exportVCard(profileObj, contactInfoObj) {
         const vCard = VCardsJS();
         const profileDb = buildDbFromLiSchema(profileObj);
         const contactDb = buildDbFromLiSchema(contactInfoObj);
@@ -1199,8 +1269,16 @@ window.LinkedinToResumeJson = (() => {
             // @ts-ignore
             vCard.socialUrls['twitter'] = `https://twitter.com/${contactInfo.twitterHandles[0]}`;
         }
-        if (contactInfo.phoneNumbers && contactInfo.phoneNumbers.length) {
-            vCard.workPhone = contactInfo.phoneNumbers[0].number;
+        if (contactInfo.phoneNumbers) {
+            contactInfo.phoneNumbers.forEach((numberObj) => {
+                if (numberObj.type === 'MOBILE') {
+                    vCard.cellPhone = numberObj.number;
+                } else if (numberObj.type === 'WORK') {
+                    vCard.workPhone = numberObj.number;
+                } else {
+                    vCard.homePhone = numberObj.number;
+                }
+            });
         }
         if (profile.birthDate && 'day' in profile.birthDate) {
             const birthdayLi = /** @type {LiDate} */ (profile.birthDate);
@@ -1212,9 +1290,20 @@ window.LinkedinToResumeJson = (() => {
             vCard.organization = positions[0].companyName;
             vCard.title = positions[0].title;
         }
-        vCard.url = this.getUrlWithoutQuery();
+        vCard.workUrl = this.getUrlWithoutQuery();
         vCard.note = profile.headline;
-        // vCard.socialUrls['facebook'] = '';
+        // Try to get profile picture
+        const photoUrl = await this.getDisplayPhoto();
+        if (photoUrl) {
+            try {
+                // Since LI photo URLs are temporary, convert to base64 first
+                const photoDataBase64 = await urlToBase64(photoUrl, true);
+                // @ts-ignore
+                vCard.photo.embedFromString(photoDataBase64.dataStr, photoDataBase64.mimeStr);
+            } catch (e) {
+                this.debugConsole.error(`Failed to convert LI image to base64`, e);
+            }
+        }
         const fileName = `${profile.firstName}_${profile.lastName}.vcf`;
         const fileContents = vCard.getFormattedString();
         this.debugConsole.log('vCard generated', fileContents);

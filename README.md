@@ -34,6 +34,8 @@ There are several main buttons in the browser extension, with different effects.
  - *Download JSON Resume Export*: Same as above, but prompts you to download the result as an actual `.json` file.
  - *Download vCard File*: Export and download the profile as a Virtual Contact File (`.vcf`) (aka *vCard*)
 
+> Warning: The LinkedIn display photo (included in vCard) served by LI is a temporary URL, with a fixed expiration date set by LinkedIn. From observations, this is often set months into the future, but could still be problematic for address book clients that don't cache images. To work around this, I'm converting it to a base64 string; this should work with most vCard clients, but also increases the vCard file size considerably.
+
 ### Chrome Side-loading Instructions
 Instead of installing from the Chrome Webstore, you might might want to "side-load" a ZIP build for either local development, or to try out a new release that has not yet made it through the Chrome review process. Here are the instructions for doing so:
 

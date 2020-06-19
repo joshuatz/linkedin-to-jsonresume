@@ -57,6 +57,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+6/18/2020 | 1.2.0 | Fix / Improve VCard export feature.
 6/5/2020 | 1.1.0 | New feature: [vCard](https://en.wikipedia.org/wiki/VCard) export, which you can import into Outlook / Google Contacts / etc.
 5/31/2020 | 1.0.0 | Brought output up to par with "spec", integrated schemas as TS, added support for multilingual profiles, overhauled JSDoc types.<br><br>Definitely a *breaking* change, since the output has changed to mirror schema more closely (biggest change is `website` in several spots has become `url`)
 5/9/2020 | 0.0.9 | Fixed "references", added certificates (behind setting), and formatting tweaks

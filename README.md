@@ -97,6 +97,9 @@ All of the above should happen automatically when you do `npm run build-bookmark
 
 If this ever garners enough interest and needs to be updated, I will probably want to re-write it with TypeScript to make it more maintainable. 
 
+### LinkedIn Documentation
+For understanding some peculiarities of the LI API, see [LinkedIn-Notes.md](./LinkedIn-Notes.md).
+
 ---
 
 ## DISCLAIMER:

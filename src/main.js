@@ -204,6 +204,25 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Set multiple query string params by passing an object
+     * @param {string} url
+     * @param {Record<string, any>} paramPairs
+     */
+    function setQueryParams(url, paramPairs) {
+        const urlInstance = new URL(url);
+        /** @type {Record<string, any>} */
+        const existingQueryPairs = {};
+        urlInstance.searchParams.forEach((val, key) => {
+            existingQueryPairs[key] = val;
+        });
+        urlInstance.search = new URLSearchParams({
+            ...existingQueryPairs,
+            ...paramPairs
+        }).toString();
+        return urlInstance.toString();
+    }
+
+    /**
      * Replace a value with a default if it is null or undefined
      * @param {any} value
      * @param {any} [optDefaultVal]
@@ -1201,6 +1220,38 @@ window.LinkedinToResumeJson = (() => {
         return supportedLocales;
     };
 
+    /**
+     * Get the internal URN ID of the active profile
+     *  - Not needed for JSON Resume, but for Voyager calls
+     *  - ID is also used as part of other URNs
+     * @param {boolean} [allowFetch] If DOM search fails, allow Voyager call to determine profile URN. Be careful about recursion...
+     * @returns {Promise<string>} profile URN ID
+     */
+    LinkedinToResumeJson.prototype.getProfileUrnId = async function getProfileUrnId(allowFetch = false) {
+        if (this.profileUrnId && this.scannedPageUrl === this.getUrlWithoutQuery()) {
+            return this.profileUrnId;
+        }
+
+        // Try to find in DOM
+        const urnPatt = /fsd_profile:([A-Za-z0-9-_]+)/g;
+        const matches = document.body.innerHTML.match(urnPatt);
+        if (matches && matches.length > 1) {
+            // eslint-disable-next-line prettier/prettier
+            // prettier-ignore
+            this.profileUrnId = (urnPatt.exec(matches[matches.length - 1]))[1];
+            return this.profileUrnId;
+        }
+
+        if (allowFetch) {
+            const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+            const profileDb = buildDbFromLiSchema(fullProfileView);
+            const profileViewUrnPatt = /urn:li:fs_profileView:(.+)$/i;
+            this.profileUrnId = profileDb.tableOfContents['entityUrn'].match(profileViewUrnPatt)[1];
+        }
+
+        return this.profileUrnId;
+    };
+
     LinkedinToResumeJson.prototype.getDisplayPhoto = async function getDisplayPhoto() {
         let photoUrl = '';
         /** @type {HTMLImageElement | null} */
@@ -1312,17 +1363,131 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     * Special - Fetch with authenticated internal API
+     *
      * @param {string} fetchEndpoint
      * @param {Record<string, string | number>} [optHeaders]
+     * @param {number} [start]
+     * @param {number} [limitPerPage]
+     * @param {number} [requestLimit]
+     * @param {number} [throttleDelayMs]
+     * @returns {Promise<LiResponse[]>} responseArr
      */
-    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint, optHeaders = {}) {
-        const _this = this;
+    LinkedinToResumeJson.prototype.voyagerFetchAutoPaginate = async function voyagerFetchAutoPaginate(
+        fetchEndpoint,
+        optHeaders = {},
+        start = 0,
+        limitPerPage = 20,
+        requestLimit = 100,
+        throttleDelayMs = 100
+    ) {
+        /** @type {LiResponse[]} */
+        const responseArr = [];
+        let url = await this.formatVoyagerUrl(fetchEndpoint);
+        let done = false;
+        let currIndex = start;
+        let requestsMade = 0;
+        /** @type {(value?: any) => void} */
+        let resolver;
+        /** @type {(reason?: any) => void} */
+        let rejector;
+
+        /**
+         * @param {any} pagingObj
+         */
+        const handlePagingData = (pagingObj) => {
+            this.debugConsole.log(`pagingObj`, pagingObj);
+            if (pagingObj && typeof pagingObj === 'object' && 'total' in pagingObj) {
+                currIndex += pagingObj.start + pagingObj.count;
+                done = currIndex >= pagingObj.total;
+            } else {
+                done = true;
+            }
+        };
+
+        /** @param {LiResponse} liResponse */
+        const handleResponse = async (liResponse) => {
+            requestsMade++;
+            responseArr.push(liResponse);
+            handlePagingData(liResponse.data.paging);
+            if (!done && requestsMade < requestLimit) {
+                await new Promise((res) => {
+                    setTimeout(() => {
+                        res();
+                    }, throttleDelayMs);
+                });
+                this.debugConsole.log(`building paginated URL`, {
+                    url,
+                    start: currIndex,
+                    count: limitPerPage
+                });
+                url = setQueryParams(url, {
+                    start: currIndex,
+                    count: limitPerPage
+                });
+                try {
+                    const response = await this.voyagerFetch(url, optHeaders);
+                    // Recurse
+                    handleResponse(response);
+                } catch (e) {
+                    // BAIL
+                    done = true;
+                    this.debugConsole.warn(e);
+                    this.debugConsole.warn(`Bailing out of auto-fetch, request failed.`);
+                }
+            } else {
+                done = true;
+            }
+
+            if (done) {
+                if (responseArr.length) {
+                    resolver(responseArr);
+                } else {
+                    rejector(new Error(`Failed to make any requests`));
+                }
+            }
+        };
+
+        // Start off the pagination chain
+        this.voyagerFetch(
+            setQueryParams(url, {
+                start: currIndex,
+                count: limitPerPage
+            })
+        ).then(handleResponse);
+
+        return new Promise((res, rej) => {
+            resolver = res;
+            rejector = rej;
+        });
+    };
+
+    /**
+     * Simple formatting for Voyager URLs - macro support, etc.
+     * @param {string} fetchEndpoint
+     * @returns {Promise<string>} formattedUrl
+     */
+    LinkedinToResumeJson.prototype.formatVoyagerUrl = async function formatVoyagerUrl(fetchEndpoint) {
         // Macro support
-        let endpoint = fetchEndpoint.replace('{profileId}', this.profileId);
+        let endpoint = fetchEndpoint.replace(/{profileId}/g, this.profileId);
+        if (endpoint.includes('{profileUrnId}')) {
+            const profileUrnId = await this.getProfileUrnId();
+            endpoint = endpoint.replace(/{profileUrnId}/g, profileUrnId);
+        }
         if (!endpoint.startsWith('https')) {
             endpoint = _voyagerBase + endpoint;
         }
+        return endpoint;
+    };
+
+    /**
+     * Special - Fetch with authenticated internal API
+     * @param {string} fetchEndpoint
+     * @param {Record<string, string | number>} [optHeaders]
+     * @returns {Promise<LiResponse>}
+     */
+    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint, optHeaders = {}) {
+        const _this = this;
+        const endpoint = await _this.formatVoyagerUrl(fetchEndpoint);
         // Set requested language
         let langHeaders = {};
         if (_this.preferLocale) {
@@ -1369,7 +1534,7 @@ window.LinkedinToResumeJson = (() => {
                     }
                 });
             } else {
-                resolve(false);
+                reject(new Error('Could not find valid LI cookie'));
             }
         });
     };

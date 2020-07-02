@@ -19,15 +19,18 @@ interface LiResponse {
 interface LiPaging {
     count: number;
     start: number;
-    tota: number;
-    // Haven't actually seen this filled in with data yet...
-    links: any[];
+    total?: number;
+    $recipeTypes?: string[];
+    // I've never actually seen this property populated...
+    // This is probably actually `Array<com.linkedin.restli.common.Link>`
+    links?: string[];
 }
 
 interface LiEntity {
     $type: string;
     entityUrn: LiUrn;
     [key: string]: any;
+    paging?: LiPaging;
 }
 
 interface LiSupportedLocale {

@@ -143,6 +143,7 @@ window.LinkedinToResumeJson = (() => {
         certificates: '*certificationView',
         education: '*educationView',
         workPositions: '*positionView',
+        workPositionGroups: '*positionGroupView',
         skills: '*skillView',
         projects: '*projectView',
         attachments: '*summaryTreasuryMedias',
@@ -159,7 +160,12 @@ window.LinkedinToResumeJson = (() => {
         advancedAboutMe: '/identity/profiles/{profileId}',
         fullProfileView: '/identity/profiles/{profileId}/profileView',
         fullSkills: '/identity/profiles/{profileId}/skillCategory',
-        recommendations: '/identity/profiles/{profileId}/recommendations'
+        recommendations: '/identity/profiles/{profileId}/recommendations',
+        dash: {
+            profilePositionGroups:
+                '/identity/dash/profilePositionGroups?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup-21',
+            fullProfile: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-53'
+        }
     };
     let _scrolledToLoad = false;
     const _toolPrefix = 'jtzLiToResumeJson';
@@ -279,6 +285,12 @@ window.LinkedinToResumeJson = (() => {
             }
             return [];
         };
+        // Same as above (getElementKeys), but returns elements themselves
+        db.getElements = function getElements() {
+            return db.getElementKeys().map((key) => {
+                return db.entitiesByUrn[key];
+            });
+        };
         /**
          * Get all elements that match type. Should usually just be one
          * @param {string} typeStr - Type, e.g. `$com.linkedin...`
@@ -354,6 +366,21 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Retrieve a LI Company Page URL from a company URN
+     * @param {string} companyUrn
+     */
+    function companyLiPageFromCompanyUrn(companyUrn) {
+        let companyPageUrl = '';
+        if (typeof companyUrn === 'string') {
+            const companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
+            if (companyIdMatch) {
+                companyPageUrl = `https://www.linkedin.com/company/${companyIdMatch[1]}`;
+            }
+        }
+        return companyPageUrl;
+    }
+
+    /**
      * Push a new skill to the resume object
      * @param {string} skillName
      */
@@ -370,15 +397,62 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Parse a LI position object and push the parsed work entry to Resume
+     * @param {LiEntity} positionObj
+     */
+    function parseAndPushPosition(positionObj) {
+        // Time period can either come as `timePeriod` or `dateRange` prop
+        const timePeriod = positionObj.timePeriod || positionObj.dateRange;
+        /** @type {ResumeSchema['work'][0]} */
+        const parsedWork = {
+            name: positionObj.companyName,
+            endDate: '',
+            highlights: [],
+            position: positionObj.title,
+            startDate: '',
+            summary: positionObj.description,
+            url: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
+        };
+        if (timePeriod && typeof timePeriod === 'object') {
+            if (timePeriod.endDate && typeof timePeriod.endDate === 'object') {
+                parsedWork.endDate = parseDate(timePeriod.endDate);
+            }
+            if (timePeriod.startDate && typeof timePeriod.startDate === 'object') {
+                parsedWork.startDate = parseDate(timePeriod.startDate);
+            }
+        }
+        // Lookup company website
+        if (positionObj.company && positionObj.company['*miniCompany']) {
+            // @TODO - website is not in schema. Use voyager?
+            // let companyInfo = db.data[position.company['*miniCompany']];
+        }
+
+        // Push to final json
+        _outputJson.work.push(parsedWork);
+        console.log({
+            work: _outputJson.work,
+            positionObj
+        });
+    }
+
+    /**
      *
-     * @param {any} instance
+     * @param {LinkedinToResumeJson} instance
      * @param {LiResponse} json
      */
-    function parseProfileSchemaJSON(instance, json) {
+    async function parseProfileSchemaJSON(instance, json) {
         let profileParseSuccess = false;
         const _this = instance;
         let foundGithub = false;
         const foundPortfolio = false;
+        /*
+        const resultSummary = {
+            parseSuccess: false,
+            sections: {
+                work: 
+            }
+        }
+        */
         try {
             const db = buildDbFromLiSchema(json);
             // Parse basics / profile
@@ -474,34 +548,22 @@ window.LinkedinToResumeJson = (() => {
             });
 
             // Parse work
-            db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
-                /** @type {ResumeSchema['work'][0]} */
-                const parsedWork = {
-                    name: position.companyName,
-                    endDate: '',
-                    highlights: [],
-                    position: position.title,
-                    startDate: '',
-                    summary: position.description,
-                    url: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
-                };
-                if (position.timePeriod && typeof position.timePeriod === 'object') {
-                    if (position.timePeriod.endDate && typeof position.timePeriod.endDate === 'object') {
-                        parsedWork.endDate = parseDate(position.timePeriod.endDate);
-                    }
-                    if (position.timePeriod.startDate && typeof position.timePeriod.startDate === 'object') {
-                        parsedWork.startDate = parseDate(position.timePeriod.startDate);
-                    }
-                }
-                // Lookup company website
-                if (position.company && position.company['*miniCompany']) {
-                    // @TODO - website is not in schema. Use voyager?
-                    // let companyInfo = db.data[position.company['*miniCompany']];
-                }
-
-                // Push to final json
-                _outputJson.work.push(parsedWork);
-            });
+            // First, check paging data to see if all work can be captured from profile object instead of separate requests
+            let allWorkCanBeCaptured = true;
+            const positionGroupView = db.getValuesByKey(_liSchemaKeys.workPositionGroups)[0];
+            if (positionGroupView.paging) {
+                const { paging } = positionGroupView;
+                allWorkCanBeCaptured = paging.start + paging.count < paging.total;
+            }
+            if (allWorkCanBeCaptured) {
+                db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
+                    parseAndPushPosition(position);
+                });
+                _this.debugConsole.log(`All work positions captured directly from profile result.`);
+            } else {
+                _this.debugConsole.warn(`Work positions in profile are truncated; requesting full results via API.`);
+                await _this.parseViaInternalApiWork();
+            }
 
             // Parse volunteer experience
             db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach((volunteering) => {
@@ -509,7 +571,7 @@ window.LinkedinToResumeJson = (() => {
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
                     position: volunteering.role,
-                    url: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                    url: companyLiPageFromCompanyUrn(volunteering['companyUrn']),
                     startDate: '',
                     endDate: '',
                     summary: volunteering.description,
@@ -643,7 +705,7 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
-     *
+     * Constructor
      * @param {boolean} [OPT_exportBeyondSpec] - Should the tool export additioanl details, beyond the official JSONResume specifications?
      * @param {boolean} [OPT_debug] - Debug Mode?
      * @param {boolean} [OPT_preferApi] - Prefer Voyager API, rather than DOM scrape?
@@ -652,6 +714,8 @@ window.LinkedinToResumeJson = (() => {
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
         const _this = this;
         this.profileId = this.getProfileId();
+        /** @type {string | null} */
+        this.profileUrnId = null;
         /** @type {LiResponse} */
         this.profileObj = {};
         /** @type {string | null} */
@@ -689,7 +753,9 @@ window.LinkedinToResumeJson = (() => {
         };
     }
 
-    LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = function parseEmbeddedLiSchema() {
+    // Regular Methods
+
+    LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = async function parseEmbeddedLiSchema() {
         const _this = this;
         let doneWithBlockIterator = false;
         let foundSomeSchema = false;
@@ -706,7 +772,8 @@ window.LinkedinToResumeJson = (() => {
                     if (schemaProfileId === desiredProfileId) {
                         doneWithBlockIterator = true;
                         foundSomeSchema = true;
-                        const profileParserResult = parseProfileSchemaJSON(_this, embeddedJson);
+                        // eslint-disable-next-line no-await-in-loop
+                        const profileParserResult = await parseProfileSchemaJSON(_this, embeddedJson);
                         _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
                         if (profileParserResult) {
                             this.profileObj = embeddedJson;
@@ -748,7 +815,7 @@ window.LinkedinToResumeJson = (() => {
             const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
             if (fullProfileView && typeof fullProfileView.data === 'object') {
                 // Try to use the same parser that I use for embedded
-                const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
+                const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult) {
                     this.profileObj = fullProfileView;
                     this.debugConsole.log('Was able to parse full profile via internal API');
@@ -883,6 +950,25 @@ window.LinkedinToResumeJson = (() => {
         return false;
     };
 
+    LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {
+        try {
+            const workResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profilePositionGroups);
+            this.debugConsole.log(workResponses);
+            workResponses.forEach((response) => {
+                const db = buildDbFromLiSchema(response);
+                // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
+                // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
+                // Faster to just bypass by looking up by `Position` type :)
+                db.getElementsByType('com.linkedin.voyager.dash.identity.profile.Position').forEach((position) => {
+                    parseAndPushPosition(position);
+                });
+            });
+        } catch (e) {
+            console.warn(e);
+            console.log('Error parsing using internal API (Voyager) - Work');
+        }
+    };
+
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
         try {
             let apiSuccessCount = 0;
@@ -999,14 +1085,14 @@ window.LinkedinToResumeJson = (() => {
                     _this.parseBasics();
                     // Embedded schema can't be used for specific locales
                     if (_this.preferApi === false && localeMatchesUser) {
-                        _this.parseEmbeddedLiSchema();
+                        await _this.parseEmbeddedLiSchema();
                         if (!_this.parseSuccess) {
                             await _this.parseViaInternalApi();
                         }
                     } else {
                         await _this.parseViaInternalApi();
                         if (!_this.parseSuccess) {
-                            this.parseEmbeddedLiSchema();
+                            await this.parseEmbeddedLiSchema();
                         }
                     }
                     _this.scannedPageUrl = _this.getUrlWithoutQuery();
@@ -1273,21 +1359,6 @@ window.LinkedinToResumeJson = (() => {
         }
 
         return photoUrl;
-    };
-
-    /**
-     * Retrieve a LI Company Page URL from a company URN
-     * @param {string} companyUrn
-     */
-    LinkedinToResumeJson.prototype.companyLiPageFromCompanyUrn = function companyLiPageFromCompanyUrn(companyUrn) {
-        let companyPageUrl = '';
-        if (typeof companyUrn === 'string') {
-            const companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
-            if (companyIdMatch) {
-                companyPageUrl = `https://www.linkedin.com/company/${companyIdMatch[1]}`;
-            }
-        }
-        return companyPageUrl;
     };
 
     LinkedinToResumeJson.prototype.generateVCard = async function generateVCard() {

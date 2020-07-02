@@ -70,6 +70,7 @@ interface InternalDb {
     entities: Array<LiEntity & {key: LiUrn}>;
     // Methods
     getElementKeys: () => string[];
+    getElements: () => Array<LiEntity & {key: LIUrn}>;
     getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[];
     getElementsByType: (typeStr: string) => LiEntity[];
     getElementByUrn: (urn: string) => LiEntity | undefined;

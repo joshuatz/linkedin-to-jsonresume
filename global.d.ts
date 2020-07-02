@@ -2,6 +2,10 @@ interface GenObj {
     [k: string]: any;
 }
 
+/**
+ * LI Types
+ */
+
 type LiUrn = string;
 
 interface LiResponse {
@@ -91,5 +95,26 @@ interface LiProfileContactInfoResponse extends LiResponse {
         twitterHandles: any[];
         weChatContactInfo: any;
         websites: null | LiWebsite[];
+    }
+}
+
+/**
+ * LI2JR Types
+ */
+type CaptureResult = 'success' | 'fail' | 'incomplete' | 'empty';
+
+interface ParseProfileSchemaResultSummary {
+    parseSuccess: boolean;
+    sections: {
+        basics: CaptureResult,
+        attachments: CaptureResult,
+        education: CaptureResult,
+        work: CaptureResult,
+        volunteer: CaptureResult,
+        certificates: CaptureResult,
+        skills: CaptureResult,
+        projects: CaptureResult,
+        awards: CaptureResult,
+        publications: CaptureResult
     }
 }

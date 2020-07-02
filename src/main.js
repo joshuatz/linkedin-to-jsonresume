@@ -429,10 +429,6 @@ window.LinkedinToResumeJson = (() => {
 
         // Push to final json
         _outputJson.work.push(parsedWork);
-        console.log({
-            work: _outputJson.work,
-            positionObj
-        });
     }
 
     /**
@@ -441,18 +437,25 @@ window.LinkedinToResumeJson = (() => {
      * @param {LiResponse} json
      */
     async function parseProfileSchemaJSON(instance, json) {
-        let profileParseSuccess = false;
         const _this = instance;
         let foundGithub = false;
         const foundPortfolio = false;
-        /*
+        /** @type {ParseProfileSchemaResultSummary} */
         const resultSummary = {
             parseSuccess: false,
             sections: {
-                work: 
+                basics: 'fail',
+                attachments: 'fail',
+                education: 'fail',
+                work: 'fail',
+                volunteer: 'fail',
+                certificates: 'fail',
+                skills: 'fail',
+                projects: 'fail',
+                awards: 'fail',
+                publications: 'fail'
             }
-        }
-        */
+        };
         try {
             const db = buildDbFromLiSchema(json);
             // Parse basics / profile
@@ -474,11 +477,13 @@ window.LinkedinToResumeJson = (() => {
                         language: profile.defaultLocale.language,
                         fluency: 'Native Speaker'
                     });
+                    resultSummary.sections.basics = 'success';
                 }
             });
 
             // Parse attachments / portfolio links
-            db.getValuesByKey(_liSchemaKeys.attachments).forEach((attachment) => {
+            const attachments = db.getValuesByKey(_liSchemaKeys.attachments);
+            attachments.forEach((attachment) => {
                 let captured = false;
                 const { url } = attachment.data;
                 if (attachment.providerName === 'GitHub' || /github\.com/gim.test(url)) {
@@ -511,9 +516,11 @@ window.LinkedinToResumeJson = (() => {
                     });
                 }
             });
+            resultSummary.sections.attachments = attachments.length ? 'success' : 'empty';
 
             // Parse education
-            db.getValuesByKey(_liSchemaKeys.education).forEach((edu) => {
+            const educationEntries = db.getValuesByKey(_liSchemaKeys.education);
+            educationEntries.forEach((edu) => {
                 /** @type {ResumeSchema['education'][0]} */
                 const parsedEdu = {
                     institution: noNullOrUndef(edu.schoolName),
@@ -546,6 +553,7 @@ window.LinkedinToResumeJson = (() => {
                 // Push to final json
                 _outputJson.education.push(parsedEdu);
             });
+            resultSummary.sections.education = educationEntries.length ? 'success' : 'empty';
 
             // Parse work
             // First, check paging data to see if all work can be captured from profile object instead of separate requests
@@ -560,13 +568,15 @@ window.LinkedinToResumeJson = (() => {
                     parseAndPushPosition(position);
                 });
                 _this.debugConsole.log(`All work positions captured directly from profile result.`);
+                resultSummary.sections.work = 'success';
             } else {
                 _this.debugConsole.warn(`Work positions in profile are truncated; requesting full results via API.`);
-                await _this.parseViaInternalApiWork();
+                resultSummary.sections.work = 'incomplete';
             }
 
             // Parse volunteer experience
-            db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach((volunteering) => {
+            const volunteerEntries = db.getValuesByKey(_liSchemaKeys.volunteerWork);
+            volunteerEntries.forEach((volunteering) => {
                 /** @type {ResumeSchema['volunteer'][0]} */
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
@@ -589,6 +599,7 @@ window.LinkedinToResumeJson = (() => {
                 // Push to final json
                 _outputJson.volunteer.push(parsedVolunteerWork);
             });
+            resultSummary.sections.volunteer = volunteerEntries.length ? 'success' : 'empty';
 
             /**
              * Parse certificates
@@ -614,6 +625,7 @@ window.LinkedinToResumeJson = (() => {
                     }
                     _outputJson.certificates.push(certObj);
                 });
+                resultSummary.sections.certificates = _outputJson.certificates.length ? 'success' : 'empty';
             }
 
             // Parse skills
@@ -632,6 +644,7 @@ window.LinkedinToResumeJson = (() => {
             skillArr.forEach((skillName) => {
                 pushSkill(skillName);
             });
+            resultSummary.sections.skills = skillArr.length ? 'success' : 'empty';
 
             // Parse projects
             // Not currently used by Resume JSON
@@ -649,10 +662,12 @@ window.LinkedinToResumeJson = (() => {
                     }
                     _outputJson.projects.push(parsedProject);
                 });
+                resultSummary.sections.projects = _outputJson.projects.length ? 'success' : 'empty';
             }
 
             // Parse awards
-            db.getValuesByKey(_liSchemaKeys.awards).forEach((award) => {
+            const awardEntries = db.getValuesByKey(_liSchemaKeys.awards);
+            awardEntries.forEach((award) => {
                 const parsedAward = {
                     title: award.title,
                     date: '',
@@ -664,9 +679,11 @@ window.LinkedinToResumeJson = (() => {
                 }
                 _outputJson.awards.push(parsedAward);
             });
+            resultSummary.sections.awards = awardEntries.length ? 'success' : 'empty';
 
             // Parse publications
-            db.getValuesByKey(_liSchemaKeys.publications).forEach((publication) => {
+            const publicationEntries = db.getValuesByKey(_liSchemaKeys.publications);
+            publicationEntries.forEach((publication) => {
                 const parsedPublication = {
                     name: publication.name,
                     publisher: publication.publisher,
@@ -679,18 +696,20 @@ window.LinkedinToResumeJson = (() => {
                 }
                 _outputJson.publications.push(parsedPublication);
             });
+            resultSummary.sections.publications = publicationEntries.length ? 'success' : 'empty';
 
             if (_this.debug) {
                 console.group('parseProfileSchemaJSON complete:');
                 console.log({
                     db,
-                    _outputJson
+                    _outputJson,
+                    resultSummary
                 });
                 console.groupEnd();
             }
 
             _this.parseSuccess = true;
-            profileParseSuccess = true;
+            resultSummary.parseSuccess = true;
         } catch (e) {
             if (_this.debug) {
                 console.group('Error parsing profile schema');
@@ -699,9 +718,9 @@ window.LinkedinToResumeJson = (() => {
                 console.log(_this);
                 console.groupEnd();
             }
-            profileParseSuccess = false;
+            resultSummary.parseSuccess = false;
         }
-        return profileParseSuccess;
+        return resultSummary;
     }
 
     /**
@@ -773,7 +792,7 @@ window.LinkedinToResumeJson = (() => {
                         doneWithBlockIterator = true;
                         foundSomeSchema = true;
                         // eslint-disable-next-line no-await-in-loop
-                        const profileParserResult = await parseProfileSchemaJSON(_this, embeddedJson);
+                        const profileParserResult = (await parseProfileSchemaJSON(_this, embeddedJson)).parseSuccess;
                         _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
                         if (profileParserResult) {
                             this.profileObj = embeddedJson;
@@ -816,9 +835,14 @@ window.LinkedinToResumeJson = (() => {
             if (fullProfileView && typeof fullProfileView.data === 'object') {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
-                if (profileParserResult) {
+                if (profileParserResult.parseSuccess) {
                     this.profileObj = fullProfileView;
                     this.debugConsole.log('Was able to parse full profile via internal API');
+                }
+                // Some sections might require additional fetches to fill missing data
+                if (profileParserResult.sections.work === 'incomplete') {
+                    _outputJson.work = [];
+                    await this.parseViaInternalApiWork();
                 }
                 this.debugConsole.log(_outputJson);
                 return true;
@@ -953,7 +977,6 @@ window.LinkedinToResumeJson = (() => {
     LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {
         try {
             const workResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profilePositionGroups);
-            this.debugConsole.log(workResponses);
             workResponses.forEach((response) => {
                 const db = buildDbFromLiSchema(response);
                 // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities

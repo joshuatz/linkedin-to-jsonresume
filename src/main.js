@@ -1491,7 +1491,7 @@ window.LinkedinToResumeJson = (() => {
         const handlePagingData = (pagingObj) => {
             this.debugConsole.log(`pagingObj`, pagingObj);
             if (pagingObj && typeof pagingObj === 'object' && 'total' in pagingObj) {
-                currIndex += pagingObj.start + pagingObj.count;
+                currIndex = pagingObj.start + pagingObj.count;
                 done = currIndex >= pagingObj.total;
             } else {
                 done = true;

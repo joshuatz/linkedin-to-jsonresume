@@ -104,6 +104,9 @@ interface LiProfileContactInfoResponse extends LiResponse {
 type CaptureResult = 'success' | 'fail' | 'incomplete' | 'empty';
 
 interface ParseProfileSchemaResultSummary {
+    profileObj: LiResponse;
+    pageUrl: string;
+    localeStr?: string;
     parseSuccess: boolean;
     sections: {
         basics: CaptureResult,

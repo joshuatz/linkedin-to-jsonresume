@@ -434,14 +434,16 @@ window.LinkedinToResumeJson = (() => {
     /**
      *
      * @param {LinkedinToResumeJson} instance
-     * @param {LiResponse} json
+     * @param {LiResponse} profileObj
      */
-    async function parseProfileSchemaJSON(instance, json) {
+    async function parseProfileSchemaJSON(instance, profileObj) {
         const _this = instance;
         let foundGithub = false;
         const foundPortfolio = false;
         /** @type {ParseProfileSchemaResultSummary} */
         const resultSummary = {
+            profileObj,
+            pageUrl: _this.getUrlWithoutQuery(),
             parseSuccess: false,
             sections: {
                 basics: 'fail',
@@ -456,8 +458,11 @@ window.LinkedinToResumeJson = (() => {
                 publications: 'fail'
             }
         };
+        if (_this.preferLocale) {
+            resultSummary.localeStr = _this.preferLocale;
+        }
         try {
-            const db = buildDbFromLiSchema(json);
+            const db = buildDbFromLiSchema(profileObj);
             // Parse basics / profile
             let profileGrabbed = false;
             db.getValuesByKey(_liSchemaKeys.profile).forEach((profile) => {
@@ -570,7 +575,7 @@ window.LinkedinToResumeJson = (() => {
                 _this.debugConsole.log(`All work positions captured directly from profile result.`);
                 resultSummary.sections.work = 'success';
             } else {
-                _this.debugConsole.warn(`Work positions in profile are truncated; requesting full results via API.`);
+                _this.debugConsole.warn(`Work positions in profile are truncated.`);
                 resultSummary.sections.work = 'incomplete';
             }
 
@@ -735,8 +740,8 @@ window.LinkedinToResumeJson = (() => {
         this.profileId = this.getProfileId();
         /** @type {string | null} */
         this.profileUrnId = null;
-        /** @type {LiResponse} */
-        this.profileObj = {};
+        /** @type {ParseProfileSchemaResultSummary} */
+        this.profileParseSummary = null;
         /** @type {string | null} */
         this.lastScannedLocale = null;
         /** @type {string | null} */
@@ -792,10 +797,10 @@ window.LinkedinToResumeJson = (() => {
                         doneWithBlockIterator = true;
                         foundSomeSchema = true;
                         // eslint-disable-next-line no-await-in-loop
-                        const profileParserResult = (await parseProfileSchemaJSON(_this, embeddedJson)).parseSuccess;
-                        _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
-                        if (profileParserResult) {
-                            this.profileObj = embeddedJson;
+                        const profileParserResult = await parseProfileSchemaJSON(_this, embeddedJson);
+                        _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult.parseSuccess}`);
+                        if (profileParserResult.parseSuccess) {
+                            this.profileParseSummary = profileParserResult;
                         }
                     } else {
                         _this.debugConsole.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
@@ -804,8 +809,7 @@ window.LinkedinToResumeJson = (() => {
                     if (_this.debug) {
                         throw e;
                     }
-                    console.warn(e);
-                    console.log('Could not parse embedded schema!');
+                    _this.debugConsole.warn('Could not parse embedded schema!', e);
                 }
             }
             if (doneWithBlockIterator) {
@@ -836,7 +840,6 @@ window.LinkedinToResumeJson = (() => {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
                 if (profileParserResult.parseSuccess) {
-                    this.profileObj = fullProfileView;
                     this.debugConsole.log('Was able to parse full profile via internal API');
                 }
                 // Some sections might require additional fetches to fill missing data
@@ -848,8 +851,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - FullProfile');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - FullProfile', e);
         }
         return false;
     };
@@ -869,8 +871,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - FullSkills');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - FullSkills', e);
         }
         return false;
     };
@@ -909,8 +910,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Contact Info');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Contact Info', e);
         }
         return false;
     };
@@ -928,8 +928,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Basic About Me');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Basic About Me', e);
         }
         return false;
     };
@@ -945,8 +944,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - AdvancedAboutMe');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - AdvancedAboutMe', e);
         }
         return false;
     };
@@ -968,8 +966,7 @@ window.LinkedinToResumeJson = (() => {
                 }
             });
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Recommendations');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Recommendations', e);
         }
         return false;
     };
@@ -987,8 +984,7 @@ window.LinkedinToResumeJson = (() => {
                 });
             });
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Work');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Work', e);
         }
     };
 
@@ -1034,17 +1030,16 @@ window.LinkedinToResumeJson = (() => {
                 this.debugConsole.error('Using internal API (Voyager) failed completely!');
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager)');
+            this.debugConsole.warn('Error parsing using internal API (Voyager)', e);
         }
     };
 
     /**
      * Trigger AJAX loading of content by scrolling
-     * @param {() => any} [callback]
+     * @param {boolean} [forceReScroll]
      */
-    LinkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function triggerAjaxLoadByScrolling(callback) {
-        const cb = typeof callback === 'function' ? callback : () => {};
+    LinkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function triggerAjaxLoadByScrolling(forceReScroll = false) {
+        _scrolledToLoad = forceReScroll ? false : _scrolledToLoad;
         if (!_scrolledToLoad) {
             // Capture current location
             const startingLocY = window.scrollY;
@@ -1060,12 +1055,10 @@ window.LinkedinToResumeJson = (() => {
                     window.scrollTo(0, startingLocY);
                     _scrolledToLoad = true;
                     resolve();
-                    cb();
                 }, 400);
             });
-        } else {
-            cb();
         }
+
         return true;
     };
 
@@ -1080,15 +1073,73 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
+     * See if profile has changed (either URL or otherwise) since last scrape
+     * @param {string} [optLocale] preferred locale
+     * @returns {boolean} hasProfileChanged
+     */
+    LinkedinToResumeJson.prototype.getHasChangedSinceLastParse = function getHasChangedSinceLastParse(optLocale) {
+        const localeToUse = optLocale || this.preferLocale;
+        const localeStayedSame = !localeToUse || optLocale === this.lastScannedLocale;
+        const pageUrlChanged = this.scannedPageUrl === this.getUrlWithoutQuery();
+
+        return localeStayedSame && pageUrlChanged;
+    };
+
+    /**
+     * Get the LI profile response
+     * @param {boolean} useCache
+     * @param {string} [optLocale] preferred locale
+     * @returns {Promise<ParseProfileSchemaResultSummary>} profile object response summary
+     */
+    LinkedinToResumeJson.prototype.getProfileResponseSummary = async function getProfileResponseSummary(useCache = true, optLocale) {
+        const localeToUse = optLocale || this.preferLocale;
+        const localeMatchesUser = !localeToUse || optLocale === this.getViewersLocalLang();
+
+        if (this.profileParseSummary && useCache) {
+            const { pageUrl, localeStr, parseSuccess } = this.profileParseSummary;
+            const urlChanged = pageUrl !== this.getUrlWithoutQuery();
+            const langChanged = !!localeToUse && localeToUse !== localeStr;
+            if (parseSuccess && !urlChanged && !langChanged) {
+                this.debugConsole.log('getProfileResponse - Used Cache');
+                return this.profileParseSummary;
+            }
+        }
+
+        // Embedded schema can't be used for specific locales
+        if (this.preferApi === false && localeMatchesUser) {
+            await this.triggerAjaxLoadByScrolling(true);
+            await this.parseEmbeddedLiSchema();
+            if (this.parseSuccess) {
+                this.debugConsole.log('getProfileResponse - Used embedded schema. Success.');
+                return this.profileParseSummary;
+            }
+        }
+
+        // Get directly via API
+        // ....
+        const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+        // Try to use the same parser that I use for embedded
+        const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
+        if (profileParserResult.parseSuccess) {
+            this.debugConsole.log('getProfileResponse - Used API. Sucess');
+            this.profileParseSummary = profileParserResult;
+            return this.profileParseSummary;
+        }
+
+        throw new Error('Could not get profile response object');
+    };
+
+    /**
      * Try to scrape / get API and parse
      * @param {string} [optLocale]
      */
     LinkedinToResumeJson.prototype.tryParse = async function tryParse(optLocale) {
         const _this = this;
         const localeToUse = optLocale || _this.preferLocale;
-        const localeStayedSame = !localeToUse || optLocale === _this.lastScannedLocale;
-        const localeMatchesUser = !localeToUse || optLocale === _this.getViewersLocalLang();
+        const localeStayedSame = !localeToUse || localeToUse === _this.lastScannedLocale;
+        const localeMatchesUser = !localeToUse || localeToUse === _this.getViewersLocalLang();
         _this.preferLocale = localeToUse || null;
+
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve) => {
             if (_this.parseSuccess) {
@@ -1103,24 +1154,27 @@ window.LinkedinToResumeJson = (() => {
                     resolve(true);
                 }
             } else {
+                // Reset output to empty template
                 _outputJson = JSON.parse(JSON.stringify(_templateJson));
-                _this.triggerAjaxLoadByScrolling(async () => {
-                    _this.parseBasics();
-                    // Embedded schema can't be used for specific locales
-                    if (_this.preferApi === false && localeMatchesUser) {
-                        await _this.parseEmbeddedLiSchema();
-                        if (!_this.parseSuccess) {
-                            await _this.parseViaInternalApi();
-                        }
-                    } else {
+                // Trigger full load
+                await _this.triggerAjaxLoadByScrolling();
+                _this.parseBasics();
+                // Embedded schema can't be used for specific locales
+                if (_this.preferApi === false && localeMatchesUser) {
+                    await _this.parseEmbeddedLiSchema();
+                    if (!_this.parseSuccess) {
                         await _this.parseViaInternalApi();
-                        if (!_this.parseSuccess) {
-                            await this.parseEmbeddedLiSchema();
-                        }
                     }
-                    _this.scannedPageUrl = _this.getUrlWithoutQuery();
-                    resolve(true);
-                });
+                } else {
+                    await _this.parseViaInternalApi();
+                    if (!_this.parseSuccess) {
+                        await this.parseEmbeddedLiSchema();
+                    }
+                }
+                _this.scannedPageUrl = _this.getUrlWithoutQuery();
+                _this.lastScannedLocale = localeToUse;
+                _this.debugConsole.log(_this);
+                resolve(true);
             }
         });
     };
@@ -1318,8 +1372,8 @@ window.LinkedinToResumeJson = (() => {
     LinkedinToResumeJson.prototype.getSupportedLocales = async function getSupportedLocales() {
         /** @type {string[]} */
         let supportedLocales = [];
-        await this.tryParse();
-        const profileDb = buildDbFromLiSchema(this.profileObj);
+        const { profileObj } = await this.getProfileResponseSummary();
+        const profileDb = buildDbFromLiSchema(profileObj);
         const userDetails = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
         if (userDetails && Array.isArray(userDetails['supportedLocales'])) {
             supportedLocales = userDetails.supportedLocales.map((locale) => {
@@ -1369,8 +1423,8 @@ window.LinkedinToResumeJson = (() => {
             photoUrl = photoElem.src;
         } else {
             // Get via miniProfile entity in full profile db
-            await this.tryParse();
-            const profileDb = buildDbFromLiSchema(this.profileObj);
+            const { profileObj } = await this.getProfileResponseSummary();
+            const profileDb = buildDbFromLiSchema(profileObj);
             const fullProfile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
             const miniProfile = profileDb.getElementByUrn(fullProfile['*miniProfile']);
             if (miniProfile && !!miniProfile.picture) {
@@ -1385,9 +1439,9 @@ window.LinkedinToResumeJson = (() => {
     };
 
     LinkedinToResumeJson.prototype.generateVCard = async function generateVCard() {
-        await this.tryParse();
+        const { profileObj } = await this.getProfileResponseSummary();
         const contactInfoObj = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-        this.exportVCard(this.profileObj, contactInfoObj);
+        this.exportVCard(profileObj, contactInfoObj);
     };
 
     /**
@@ -1489,7 +1543,6 @@ window.LinkedinToResumeJson = (() => {
          * @param {any} pagingObj
          */
         const handlePagingData = (pagingObj) => {
-            this.debugConsole.log(`pagingObj`, pagingObj);
             if (pagingObj && typeof pagingObj === 'object' && 'total' in pagingObj) {
                 currIndex = pagingObj.start + pagingObj.count;
                 done = currIndex >= pagingObj.total;
@@ -1509,11 +1562,6 @@ window.LinkedinToResumeJson = (() => {
                         res();
                     }, throttleDelayMs);
                 });
-                this.debugConsole.log(`building paginated URL`, {
-                    url,
-                    start: currIndex,
-                    count: limitPerPage
-                });
                 url = setQueryParams(url, {
                     start: currIndex,
                     count: limitPerPage
@@ -1525,8 +1573,7 @@ window.LinkedinToResumeJson = (() => {
                 } catch (e) {
                     // BAIL
                     done = true;
-                    this.debugConsole.warn(e);
-                    this.debugConsole.warn(`Bailing out of auto-fetch, request failed.`);
+                    this.debugConsole.warn(`Bailing out of auto-fetch, request failed.`, e);
                 }
             } else {
                 done = true;

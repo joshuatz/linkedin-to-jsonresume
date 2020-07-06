@@ -57,6 +57,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+7/6/2020 | 1.3.0 | Fix: Incomplete work position entries for some users; LI was limiting the amount of pre-fetched data. Had to implement request paging to fix.<br/><br/>Also refactored a lot of code, improved result caching, and other tweaks.
 6/18/2020 | 1.2.0 | Fix / Improve VCard export feature.
 6/5/2020 | 1.1.0 | New feature: [vCard](https://en.wikipedia.org/wiki/VCard) export, which you can import into Outlook / Google Contacts / etc.
 5/31/2020 | 1.0.0 | Brought output up to par with "spec", integrated schemas as TS, added support for multilingual profiles, overhauled JSDoc types.<br><br>Definitely a *breaking* change, since the output has changed to mirror schema more closely (biggest change is `website` in several spots has become `url`)

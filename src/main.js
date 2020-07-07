@@ -307,6 +307,10 @@ window.LinkedinToResumeJson = (() => {
         db.getElementByUrn = function getElementByUrn(urn) {
             return db.entitiesByUrn[urn];
         };
+        db.getValueByKey = function getValueByKey(key) {
+            return db.entitiesByUrn[db.tableOfContents[key]];
+        };
+        // This, opposed to getValuesByKey, allow for multi-depth traversal
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
@@ -397,12 +401,71 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Since LI entities can store dates in different ways, but
+     * JSONResume only stores in one, this utility method will detect
+     * which format LI is using, parse it, and attach to Resume object
+     * (e.g. work position entry), with correct date format
+     *  - NOTE: This modifies object in-place
+     * @param {GenObj} resumeObj
+     * @param {LiEntity} liEntity
+     */
+    function parseAndAttachResumeDates(resumeObj, liEntity) {
+        // Time period can either come as `timePeriod` or `dateRange` prop
+        const timePeriod = liEntity.timePeriod || liEntity.dateRange;
+        if (timePeriod) {
+            const start = timePeriod.startDate || timePeriod.start;
+            const end = timePeriod.endDate || timePeriod.end;
+            if (end) {
+                // eslint-disable-next-line no-param-reassign
+                resumeObj.endDate = parseDate(end);
+            }
+            if (start) {
+                // eslint-disable-next-line no-param-reassign
+                resumeObj.startDate = parseDate(start);
+            }
+        }
+    }
+
+    /**
+     * Parse a LI education object and push the parsed education entry to Resume
+     * @param {LiEntity} educationObj
+     * @param {InternalDb} db
+     * @param {LinkedinToResumeJson} instance
+     */
+    function parseAndPushEducation(educationObj, db, instance) {
+        const _this = instance;
+        const edu = educationObj;
+        /** @type {ResumeSchema['education'][0]} */
+        const parsedEdu = {
+            institution: noNullOrUndef(edu.schoolName),
+            area: noNullOrUndef(edu.fieldOfStudy),
+            studyType: noNullOrUndef(edu.degreeName),
+            startDate: '',
+            endDate: '',
+            gpa: noNullOrUndef(edu.grade),
+            courses: []
+        };
+        parseAndAttachResumeDates(parsedEdu, edu);
+        if (Array.isArray(edu.courses)) {
+            // Lookup course names
+            edu.courses.forEach((courseKey) => {
+                const courseInfo = db.entitiesByUrn[courseKey];
+                if (courseInfo) {
+                    parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
+                } else {
+                    _this.debugConsole.warn('could not find course:', courseKey);
+                }
+            });
+        }
+        // Push to final json
+        _outputJson.education.push(parsedEdu);
+    }
+
+    /**
      * Parse a LI position object and push the parsed work entry to Resume
      * @param {LiEntity} positionObj
      */
     function parseAndPushPosition(positionObj) {
-        // Time period can either come as `timePeriod` or `dateRange` prop
-        const timePeriod = positionObj.timePeriod || positionObj.dateRange;
         /** @type {ResumeSchema['work'][0]} */
         const parsedWork = {
             name: positionObj.companyName,
@@ -413,14 +476,7 @@ window.LinkedinToResumeJson = (() => {
             summary: positionObj.description,
             url: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
         };
-        if (timePeriod && typeof timePeriod === 'object') {
-            if (timePeriod.endDate && typeof timePeriod.endDate === 'object') {
-                parsedWork.endDate = parseDate(timePeriod.endDate);
-            }
-            if (timePeriod.startDate && typeof timePeriod.startDate === 'object') {
-                parsedWork.startDate = parseDate(timePeriod.startDate);
-            }
-        }
+        parseAndAttachResumeDates(parsedWork, positionObj);
         // Lookup company website
         if (positionObj.company && positionObj.company['*miniCompany']) {
             // @TODO - website is not in schema. Use voyager?
@@ -524,49 +580,32 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.sections.attachments = attachments.length ? 'success' : 'empty';
 
             // Parse education
-            const educationEntries = db.getValuesByKey(_liSchemaKeys.education);
-            educationEntries.forEach((edu) => {
-                /** @type {ResumeSchema['education'][0]} */
-                const parsedEdu = {
-                    institution: noNullOrUndef(edu.schoolName),
-                    area: noNullOrUndef(edu.fieldOfStudy),
-                    studyType: noNullOrUndef(edu.degreeName),
-                    startDate: '',
-                    endDate: '',
-                    gpa: noNullOrUndef(edu.grade),
-                    courses: []
-                };
-                if (edu.timePeriod && typeof edu.timePeriod === 'object') {
-                    if (edu.timePeriod.startDate && typeof edu.timePeriod.startDate === 'object') {
-                        parsedEdu.startDate = parseDate(edu.timePeriod.startDate);
-                    }
-                    if (edu.timePeriod.endDate && typeof edu.timePeriod.endDate === 'object') {
-                        parsedEdu.endDate = parseDate(edu.timePeriod.endDate);
-                    }
-                }
-                if (Array.isArray(edu.courses)) {
-                    // Lookup course names
-                    edu.courses.forEach((courseKey) => {
-                        const courseInfo = db.entitiesByUrn[courseKey];
-                        if (courseInfo) {
-                            parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
-                        } else {
-                            _this.debugConsole.warn('could not find course:', courseKey);
-                        }
-                    });
-                }
-                // Push to final json
-                _outputJson.education.push(parsedEdu);
-            });
-            resultSummary.sections.education = educationEntries.length ? 'success' : 'empty';
+            let allEducationCanBeCaptured = true;
+            // educationView contains both paging data, and list of child elements
+            const educationView = db.getValueByKey(_liSchemaKeys.education);
+            if (educationView.paging) {
+                const { paging } = educationView;
+                allEducationCanBeCaptured = paging.start + paging.count >= paging.total;
+            }
+            if (allEducationCanBeCaptured) {
+                const educationEntries = db.getValuesByKey(_liSchemaKeys.education);
+                educationEntries.forEach((edu) => {
+                    parseAndPushEducation(edu, db, _this);
+                });
+                _this.debugConsole.log(`All education positions captured directly from profile result.`);
+                resultSummary.sections.education = 'success';
+            } else {
+                _this.debugConsole.warn(`Education positions in profile are truncated.`);
+                resultSummary.sections.education = 'incomplete';
+            }
 
             // Parse work
-            // First, check paging data to see if all work can be captured from profile object instead of separate requests
+            // First, check paging data
             let allWorkCanBeCaptured = true;
-            const positionGroupView = db.getValuesByKey(_liSchemaKeys.workPositionGroups)[0];
-            if (positionGroupView.paging) {
-                const { paging } = positionGroupView;
-                allWorkCanBeCaptured = paging.start + paging.count < paging.total;
+            const positionView = db.getValueByKey(_liSchemaKeys.workPositions);
+            if (positionView.paging) {
+                const { paging } = positionView;
+                allWorkCanBeCaptured = paging.start + paging.count >= paging.total;
             }
             if (allWorkCanBeCaptured) {
                 db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
@@ -592,14 +631,7 @@ window.LinkedinToResumeJson = (() => {
                     summary: volunteering.description,
                     highlights: []
                 };
-                if (volunteering.timePeriod && typeof volunteering.timePeriod === 'object') {
-                    if (typeof volunteering.timePeriod.endDate === 'object' && volunteering.timePeriod.endDate !== null) {
-                        parsedVolunteerWork.endDate = parseDate(volunteering.timePeriod.endDate);
-                    }
-                    if (typeof volunteering.timePeriod.startDate === 'object' && volunteering.timePeriod.startDate !== null) {
-                        parsedVolunteerWork.startDate = parseDate(volunteering.timePeriod.startDate);
-                    }
-                }
+                parseAndAttachResumeDates(parsedVolunteerWork, volunteering);
 
                 // Push to final json
                 _outputJson.volunteer.push(parsedVolunteerWork);
@@ -622,9 +654,7 @@ window.LinkedinToResumeJson = (() => {
                         title: cert.name,
                         issuer: cert.authority
                     };
-                    if (typeof cert.timePeriod === 'object' && cert.timePeriod.startDate) {
-                        certObj.date = parseDate(cert.timePeriod.startDate);
-                    }
+                    parseAndAttachResumeDates(certObj, cert);
                     if (typeof cert.url === 'string' && cert.url) {
                         certObj.url = cert.url;
                     }
@@ -662,9 +692,7 @@ window.LinkedinToResumeJson = (() => {
                         summary: project.description,
                         url: project.url
                     };
-                    if (project.timePeriod && typeof project.timePeriod === 'object') {
-                        parsedProject.startDate = parseDate(project.timePeriod.startDate);
-                    }
+                    parseAndAttachResumeDates(parsedProject, project);
                     _outputJson.projects.push(parsedProject);
                 });
                 resultSummary.sections.projects = _outputJson.projects.length ? 'success' : 'empty';
@@ -696,7 +724,7 @@ window.LinkedinToResumeJson = (() => {
                     website: noNullOrUndef(publication.url),
                     summary: noNullOrUndef(publication.description)
                 };
-                if (typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
+                if (publication.date && typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
                     parsedPublication.releaseDate = parseDate(publication.date);
                 }
                 _outputJson.publications.push(parsedPublication);
@@ -754,6 +782,7 @@ window.LinkedinToResumeJson = (() => {
         this.debug = typeof OPT_debug === 'boolean' ? OPT_debug : false;
         if (this.debug) {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
+            this.buildDbFromLiSchema = buildDbFromLiSchema;
         }
         this.debugConsole = {
             /** @type {(...args: any[]) => void} */
@@ -846,6 +875,10 @@ window.LinkedinToResumeJson = (() => {
                 if (profileParserResult.sections.work === 'incomplete') {
                     _outputJson.work = [];
                     await this.parseViaInternalApiWork();
+                }
+                if (profileParserResult.sections.education === 'incomplete') {
+                    _outputJson.education = [];
+                    await this.parseViaInternalApiEducation();
                 }
                 this.debugConsole.log(_outputJson);
                 return true;
@@ -985,6 +1018,21 @@ window.LinkedinToResumeJson = (() => {
             });
         } catch (e) {
             this.debugConsole.warn('Error parsing using internal API (Voyager) - Work', e);
+        }
+    };
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiEducation = async function parseViaInternalApiEducation() {
+        try {
+            // This is a really annoying lookup - I can't find a separate API endpoint, so I have to use the full-FULL (dash) profile endpoint...
+            const fullDashProfileObj = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile);
+            const db = buildDbFromLiSchema(fullDashProfileObj);
+            // Response is missing ToC, so just look up by namespace / schema
+            const eduEntries = db.getElementsByType('com.linkedin.voyager.dash.identity.profile.Education');
+            eduEntries.forEach((edu) => {
+                parseAndPushEducation(edu, db, this);
+            });
+        } catch (e) {
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Education', e);
         }
     };
 

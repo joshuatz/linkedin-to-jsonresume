@@ -1,5 +1,6 @@
 {
   "extends": ["airbnb-base","plugin:prettier/recommended"],
+  "ignorePatterns": ["**/build/**/*", "**/scratch**/*"],
   "parserOptions": {
     "ecmaVersion": 2018
   },

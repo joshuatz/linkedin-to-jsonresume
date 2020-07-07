@@ -143,6 +143,7 @@ window.LinkedinToResumeJson = (() => {
         certificates: '*certificationView',
         education: '*educationView',
         workPositions: '*positionView',
+        workPositionGroups: '*positionGroupView',
         skills: '*skillView',
         projects: '*projectView',
         attachments: '*summaryTreasuryMedias',
@@ -159,7 +160,12 @@ window.LinkedinToResumeJson = (() => {
         advancedAboutMe: '/identity/profiles/{profileId}',
         fullProfileView: '/identity/profiles/{profileId}/profileView',
         fullSkills: '/identity/profiles/{profileId}/skillCategory',
-        recommendations: '/identity/profiles/{profileId}/recommendations'
+        recommendations: '/identity/profiles/{profileId}/recommendations',
+        dash: {
+            profilePositionGroups:
+                '/identity/dash/profilePositionGroups?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup-21',
+            fullProfile: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-53'
+        }
     };
     let _scrolledToLoad = false;
     const _toolPrefix = 'jtzLiToResumeJson';
@@ -201,6 +207,25 @@ window.LinkedinToResumeJson = (() => {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
+    }
+
+    /**
+     * Set multiple query string params by passing an object
+     * @param {string} url
+     * @param {Record<string, any>} paramPairs
+     */
+    function setQueryParams(url, paramPairs) {
+        const urlInstance = new URL(url);
+        /** @type {Record<string, any>} */
+        const existingQueryPairs = {};
+        urlInstance.searchParams.forEach((val, key) => {
+            existingQueryPairs[key] = val;
+        });
+        urlInstance.search = new URLSearchParams({
+            ...existingQueryPairs,
+            ...paramPairs
+        }).toString();
+        return urlInstance.toString();
     }
 
     /**
@@ -260,6 +285,12 @@ window.LinkedinToResumeJson = (() => {
             }
             return [];
         };
+        // Same as above (getElementKeys), but returns elements themselves
+        db.getElements = function getElements() {
+            return db.getElementKeys().map((key) => {
+                return db.entitiesByUrn[key];
+            });
+        };
         /**
          * Get all elements that match type. Should usually just be one
          * @param {string} typeStr - Type, e.g. `$com.linkedin...`
@@ -276,6 +307,10 @@ window.LinkedinToResumeJson = (() => {
         db.getElementByUrn = function getElementByUrn(urn) {
             return db.entitiesByUrn[urn];
         };
+        db.getValueByKey = function getValueByKey(key) {
+            return db.entitiesByUrn[db.tableOfContents[key]];
+        };
+        // This, opposed to getValuesByKey, allow for multi-depth traversal
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
             let tocVal = this.tableOfContents[key];
@@ -335,6 +370,21 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Retrieve a LI Company Page URL from a company URN
+     * @param {string} companyUrn
+     */
+    function companyLiPageFromCompanyUrn(companyUrn) {
+        let companyPageUrl = '';
+        if (typeof companyUrn === 'string') {
+            const companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
+            if (companyIdMatch) {
+                companyPageUrl = `https://www.linkedin.com/company/${companyIdMatch[1]}`;
+            }
+        }
+        return companyPageUrl;
+    }
+
+    /**
      * Push a new skill to the resume object
      * @param {string} skillName
      */
@@ -351,17 +401,124 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
-     *
-     * @param {any} instance
-     * @param {LiResponse} json
+     * Since LI entities can store dates in different ways, but
+     * JSONResume only stores in one, this utility method will detect
+     * which format LI is using, parse it, and attach to Resume object
+     * (e.g. work position entry), with correct date format
+     *  - NOTE: This modifies object in-place
+     * @param {GenObj} resumeObj
+     * @param {LiEntity} liEntity
      */
-    function parseProfileSchemaJSON(instance, json) {
-        let profileParseSuccess = false;
+    function parseAndAttachResumeDates(resumeObj, liEntity) {
+        // Time period can either come as `timePeriod` or `dateRange` prop
+        const timePeriod = liEntity.timePeriod || liEntity.dateRange;
+        if (timePeriod) {
+            const start = timePeriod.startDate || timePeriod.start;
+            const end = timePeriod.endDate || timePeriod.end;
+            if (end) {
+                // eslint-disable-next-line no-param-reassign
+                resumeObj.endDate = parseDate(end);
+            }
+            if (start) {
+                // eslint-disable-next-line no-param-reassign
+                resumeObj.startDate = parseDate(start);
+            }
+        }
+    }
+
+    /**
+     * Parse a LI education object and push the parsed education entry to Resume
+     * @param {LiEntity} educationObj
+     * @param {InternalDb} db
+     * @param {LinkedinToResumeJson} instance
+     */
+    function parseAndPushEducation(educationObj, db, instance) {
+        const _this = instance;
+        const edu = educationObj;
+        /** @type {ResumeSchema['education'][0]} */
+        const parsedEdu = {
+            institution: noNullOrUndef(edu.schoolName),
+            area: noNullOrUndef(edu.fieldOfStudy),
+            studyType: noNullOrUndef(edu.degreeName),
+            startDate: '',
+            endDate: '',
+            gpa: noNullOrUndef(edu.grade),
+            courses: []
+        };
+        parseAndAttachResumeDates(parsedEdu, edu);
+        if (Array.isArray(edu.courses)) {
+            // Lookup course names
+            edu.courses.forEach((courseKey) => {
+                const courseInfo = db.entitiesByUrn[courseKey];
+                if (courseInfo) {
+                    parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
+                } else {
+                    _this.debugConsole.warn('could not find course:', courseKey);
+                }
+            });
+        }
+        // Push to final json
+        _outputJson.education.push(parsedEdu);
+    }
+
+    /**
+     * Parse a LI position object and push the parsed work entry to Resume
+     * @param {LiEntity} positionObj
+     */
+    function parseAndPushPosition(positionObj) {
+        /** @type {ResumeSchema['work'][0]} */
+        const parsedWork = {
+            name: positionObj.companyName,
+            endDate: '',
+            highlights: [],
+            position: positionObj.title,
+            startDate: '',
+            summary: positionObj.description,
+            url: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
+        };
+        parseAndAttachResumeDates(parsedWork, positionObj);
+        // Lookup company website
+        if (positionObj.company && positionObj.company['*miniCompany']) {
+            // @TODO - website is not in schema. Use voyager?
+            // let companyInfo = db.data[position.company['*miniCompany']];
+        }
+
+        // Push to final json
+        _outputJson.work.push(parsedWork);
+    }
+
+    /**
+     *
+     * @param {LinkedinToResumeJson} instance
+     * @param {LiResponse} profileObj
+     */
+    async function parseProfileSchemaJSON(instance, profileObj) {
         const _this = instance;
         let foundGithub = false;
         const foundPortfolio = false;
+        /** @type {ParseProfileSchemaResultSummary} */
+        const resultSummary = {
+            profileObj,
+            pageUrl: _this.getUrlWithoutQuery(),
+            parseSuccess: false,
+            sections: {
+                basics: 'fail',
+                attachments: 'fail',
+                education: 'fail',
+                work: 'fail',
+                volunteer: 'fail',
+                certificates: 'fail',
+                skills: 'fail',
+                projects: 'fail',
+                awards: 'fail',
+                publications: 'fail'
+            }
+        };
+        if (_this.preferLocale) {
+            resultSummary.localeStr = _this.preferLocale;
+        }
         try {
-            const db = buildDbFromLiSchema(json);
+            const db = buildDbFromLiSchema(profileObj);
             // Parse basics / profile
             let profileGrabbed = false;
             db.getValuesByKey(_liSchemaKeys.profile).forEach((profile) => {
@@ -381,11 +538,13 @@ window.LinkedinToResumeJson = (() => {
                         language: profile.defaultLocale.language,
                         fluency: 'Native Speaker'
                     });
+                    resultSummary.sections.basics = 'success';
                 }
             });
 
             // Parse attachments / portfolio links
-            db.getValuesByKey(_liSchemaKeys.attachments).forEach((attachment) => {
+            const attachments = db.getValuesByKey(_liSchemaKeys.attachments);
+            attachments.forEach((attachment) => {
                 let captured = false;
                 const { url } = attachment.data;
                 if (attachment.providerName === 'GitHub' || /github\.com/gim.test(url)) {
@@ -418,96 +577,66 @@ window.LinkedinToResumeJson = (() => {
                     });
                 }
             });
+            resultSummary.sections.attachments = attachments.length ? 'success' : 'empty';
 
             // Parse education
-            db.getValuesByKey(_liSchemaKeys.education).forEach((edu) => {
-                /** @type {ResumeSchema['education'][0]} */
-                const parsedEdu = {
-                    institution: noNullOrUndef(edu.schoolName),
-                    area: noNullOrUndef(edu.fieldOfStudy),
-                    studyType: noNullOrUndef(edu.degreeName),
-                    startDate: '',
-                    endDate: '',
-                    gpa: noNullOrUndef(edu.grade),
-                    courses: []
-                };
-                if (edu.timePeriod && typeof edu.timePeriod === 'object') {
-                    if (edu.timePeriod.startDate && typeof edu.timePeriod.startDate === 'object') {
-                        parsedEdu.startDate = parseDate(edu.timePeriod.startDate);
-                    }
-                    if (edu.timePeriod.endDate && typeof edu.timePeriod.endDate === 'object') {
-                        parsedEdu.endDate = parseDate(edu.timePeriod.endDate);
-                    }
-                }
-                if (Array.isArray(edu.courses)) {
-                    // Lookup course names
-                    edu.courses.forEach((courseKey) => {
-                        const courseInfo = db.entitiesByUrn[courseKey];
-                        if (courseInfo) {
-                            parsedEdu.courses.push(`${courseInfo.number} - ${courseInfo.name}`);
-                        } else {
-                            _this.debugConsole.warn('could not find course:', courseKey);
-                        }
-                    });
-                }
-                // Push to final json
-                _outputJson.education.push(parsedEdu);
-            });
+            let allEducationCanBeCaptured = true;
+            // educationView contains both paging data, and list of child elements
+            const educationView = db.getValueByKey(_liSchemaKeys.education);
+            if (educationView.paging) {
+                const { paging } = educationView;
+                allEducationCanBeCaptured = paging.start + paging.count >= paging.total;
+            }
+            if (allEducationCanBeCaptured) {
+                const educationEntries = db.getValuesByKey(_liSchemaKeys.education);
+                educationEntries.forEach((edu) => {
+                    parseAndPushEducation(edu, db, _this);
+                });
+                _this.debugConsole.log(`All education positions captured directly from profile result.`);
+                resultSummary.sections.education = 'success';
+            } else {
+                _this.debugConsole.warn(`Education positions in profile are truncated.`);
+                resultSummary.sections.education = 'incomplete';
+            }
 
             // Parse work
-            db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
-                /** @type {ResumeSchema['work'][0]} */
-                const parsedWork = {
-                    name: position.companyName,
-                    endDate: '',
-                    highlights: [],
-                    position: position.title,
-                    startDate: '',
-                    summary: position.description,
-                    url: _this.companyLiPageFromCompanyUrn(position['companyUrn'])
-                };
-                if (position.timePeriod && typeof position.timePeriod === 'object') {
-                    if (position.timePeriod.endDate && typeof position.timePeriod.endDate === 'object') {
-                        parsedWork.endDate = parseDate(position.timePeriod.endDate);
-                    }
-                    if (position.timePeriod.startDate && typeof position.timePeriod.startDate === 'object') {
-                        parsedWork.startDate = parseDate(position.timePeriod.startDate);
-                    }
-                }
-                // Lookup company website
-                if (position.company && position.company['*miniCompany']) {
-                    // @TODO - website is not in schema. Use voyager?
-                    // let companyInfo = db.data[position.company['*miniCompany']];
-                }
-
-                // Push to final json
-                _outputJson.work.push(parsedWork);
-            });
+            // First, check paging data
+            let allWorkCanBeCaptured = true;
+            const positionView = db.getValueByKey(_liSchemaKeys.workPositions);
+            if (positionView.paging) {
+                const { paging } = positionView;
+                allWorkCanBeCaptured = paging.start + paging.count >= paging.total;
+            }
+            if (allWorkCanBeCaptured) {
+                db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
+                    parseAndPushPosition(position);
+                });
+                _this.debugConsole.log(`All work positions captured directly from profile result.`);
+                resultSummary.sections.work = 'success';
+            } else {
+                _this.debugConsole.warn(`Work positions in profile are truncated.`);
+                resultSummary.sections.work = 'incomplete';
+            }
 
             // Parse volunteer experience
-            db.getValuesByKey(_liSchemaKeys.volunteerWork).forEach((volunteering) => {
+            const volunteerEntries = db.getValuesByKey(_liSchemaKeys.volunteerWork);
+            volunteerEntries.forEach((volunteering) => {
                 /** @type {ResumeSchema['volunteer'][0]} */
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
                     position: volunteering.role,
-                    url: _this.companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                    url: companyLiPageFromCompanyUrn(volunteering['companyUrn']),
                     startDate: '',
                     endDate: '',
                     summary: volunteering.description,
                     highlights: []
                 };
-                if (volunteering.timePeriod && typeof volunteering.timePeriod === 'object') {
-                    if (typeof volunteering.timePeriod.endDate === 'object' && volunteering.timePeriod.endDate !== null) {
-                        parsedVolunteerWork.endDate = parseDate(volunteering.timePeriod.endDate);
-                    }
-                    if (typeof volunteering.timePeriod.startDate === 'object' && volunteering.timePeriod.startDate !== null) {
-                        parsedVolunteerWork.startDate = parseDate(volunteering.timePeriod.startDate);
-                    }
-                }
+                parseAndAttachResumeDates(parsedVolunteerWork, volunteering);
 
                 // Push to final json
                 _outputJson.volunteer.push(parsedVolunteerWork);
             });
+            resultSummary.sections.volunteer = volunteerEntries.length ? 'success' : 'empty';
 
             /**
              * Parse certificates
@@ -525,14 +654,13 @@ window.LinkedinToResumeJson = (() => {
                         title: cert.name,
                         issuer: cert.authority
                     };
-                    if (typeof cert.timePeriod === 'object' && cert.timePeriod.startDate) {
-                        certObj.date = parseDate(cert.timePeriod.startDate);
-                    }
+                    parseAndAttachResumeDates(certObj, cert);
                     if (typeof cert.url === 'string' && cert.url) {
                         certObj.url = cert.url;
                     }
                     _outputJson.certificates.push(certObj);
                 });
+                resultSummary.sections.certificates = _outputJson.certificates.length ? 'success' : 'empty';
             }
 
             // Parse skills
@@ -551,6 +679,7 @@ window.LinkedinToResumeJson = (() => {
             skillArr.forEach((skillName) => {
                 pushSkill(skillName);
             });
+            resultSummary.sections.skills = skillArr.length ? 'success' : 'empty';
 
             // Parse projects
             // Not currently used by Resume JSON
@@ -563,15 +692,15 @@ window.LinkedinToResumeJson = (() => {
                         summary: project.description,
                         url: project.url
                     };
-                    if (project.timePeriod && typeof project.timePeriod === 'object') {
-                        parsedProject.startDate = parseDate(project.timePeriod.startDate);
-                    }
+                    parseAndAttachResumeDates(parsedProject, project);
                     _outputJson.projects.push(parsedProject);
                 });
+                resultSummary.sections.projects = _outputJson.projects.length ? 'success' : 'empty';
             }
 
             // Parse awards
-            db.getValuesByKey(_liSchemaKeys.awards).forEach((award) => {
+            const awardEntries = db.getValuesByKey(_liSchemaKeys.awards);
+            awardEntries.forEach((award) => {
                 const parsedAward = {
                     title: award.title,
                     date: '',
@@ -583,9 +712,11 @@ window.LinkedinToResumeJson = (() => {
                 }
                 _outputJson.awards.push(parsedAward);
             });
+            resultSummary.sections.awards = awardEntries.length ? 'success' : 'empty';
 
             // Parse publications
-            db.getValuesByKey(_liSchemaKeys.publications).forEach((publication) => {
+            const publicationEntries = db.getValuesByKey(_liSchemaKeys.publications);
+            publicationEntries.forEach((publication) => {
                 const parsedPublication = {
                     name: publication.name,
                     publisher: publication.publisher,
@@ -593,23 +724,25 @@ window.LinkedinToResumeJson = (() => {
                     website: noNullOrUndef(publication.url),
                     summary: noNullOrUndef(publication.description)
                 };
-                if (typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
+                if (publication.date && typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
                     parsedPublication.releaseDate = parseDate(publication.date);
                 }
                 _outputJson.publications.push(parsedPublication);
             });
+            resultSummary.sections.publications = publicationEntries.length ? 'success' : 'empty';
 
             if (_this.debug) {
                 console.group('parseProfileSchemaJSON complete:');
                 console.log({
                     db,
-                    _outputJson
+                    _outputJson,
+                    resultSummary
                 });
                 console.groupEnd();
             }
 
             _this.parseSuccess = true;
-            profileParseSuccess = true;
+            resultSummary.parseSuccess = true;
         } catch (e) {
             if (_this.debug) {
                 console.group('Error parsing profile schema');
@@ -618,13 +751,13 @@ window.LinkedinToResumeJson = (() => {
                 console.log(_this);
                 console.groupEnd();
             }
-            profileParseSuccess = false;
+            resultSummary.parseSuccess = false;
         }
-        return profileParseSuccess;
+        return resultSummary;
     }
 
     /**
-     *
+     * Constructor
      * @param {boolean} [OPT_exportBeyondSpec] - Should the tool export additioanl details, beyond the official JSONResume specifications?
      * @param {boolean} [OPT_debug] - Debug Mode?
      * @param {boolean} [OPT_preferApi] - Prefer Voyager API, rather than DOM scrape?
@@ -633,8 +766,10 @@ window.LinkedinToResumeJson = (() => {
     function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
         const _this = this;
         this.profileId = this.getProfileId();
-        /** @type {LiResponse} */
-        this.profileObj = {};
+        /** @type {string | null} */
+        this.profileUrnId = null;
+        /** @type {ParseProfileSchemaResultSummary} */
+        this.profileParseSummary = null;
         /** @type {string | null} */
         this.lastScannedLocale = null;
         /** @type {string | null} */
@@ -647,6 +782,7 @@ window.LinkedinToResumeJson = (() => {
         this.debug = typeof OPT_debug === 'boolean' ? OPT_debug : false;
         if (this.debug) {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
+            this.buildDbFromLiSchema = buildDbFromLiSchema;
         }
         this.debugConsole = {
             /** @type {(...args: any[]) => void} */
@@ -670,7 +806,9 @@ window.LinkedinToResumeJson = (() => {
         };
     }
 
-    LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = function parseEmbeddedLiSchema() {
+    // Regular Methods
+
+    LinkedinToResumeJson.prototype.parseEmbeddedLiSchema = async function parseEmbeddedLiSchema() {
         const _this = this;
         let doneWithBlockIterator = false;
         let foundSomeSchema = false;
@@ -687,10 +825,11 @@ window.LinkedinToResumeJson = (() => {
                     if (schemaProfileId === desiredProfileId) {
                         doneWithBlockIterator = true;
                         foundSomeSchema = true;
-                        const profileParserResult = parseProfileSchemaJSON(_this, embeddedJson);
-                        _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult}`);
-                        if (profileParserResult) {
-                            this.profileObj = embeddedJson;
+                        // eslint-disable-next-line no-await-in-loop
+                        const profileParserResult = await parseProfileSchemaJSON(_this, embeddedJson);
+                        _this.debugConsole.log(`Parse from embedded schema, success = ${profileParserResult.parseSuccess}`);
+                        if (profileParserResult.parseSuccess) {
+                            this.profileParseSummary = profileParserResult;
                         }
                     } else {
                         _this.debugConsole.log(`Valid schema found, but schema profile id of "${schemaProfileId}" does not match desired profile ID of "${desiredProfileId}".`);
@@ -699,8 +838,7 @@ window.LinkedinToResumeJson = (() => {
                     if (_this.debug) {
                         throw e;
                     }
-                    console.warn(e);
-                    console.log('Could not parse embedded schema!');
+                    _this.debugConsole.warn('Could not parse embedded schema!', e);
                 }
             }
             if (doneWithBlockIterator) {
@@ -729,17 +867,24 @@ window.LinkedinToResumeJson = (() => {
             const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
             if (fullProfileView && typeof fullProfileView.data === 'object') {
                 // Try to use the same parser that I use for embedded
-                const profileParserResult = parseProfileSchemaJSON(this, fullProfileView);
-                if (profileParserResult) {
-                    this.profileObj = fullProfileView;
+                const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
+                if (profileParserResult.parseSuccess) {
                     this.debugConsole.log('Was able to parse full profile via internal API');
+                }
+                // Some sections might require additional fetches to fill missing data
+                if (profileParserResult.sections.work === 'incomplete') {
+                    _outputJson.work = [];
+                    await this.parseViaInternalApiWork();
+                }
+                if (profileParserResult.sections.education === 'incomplete') {
+                    _outputJson.education = [];
+                    await this.parseViaInternalApiEducation();
                 }
                 this.debugConsole.log(_outputJson);
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - FullProfile');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - FullProfile', e);
         }
         return false;
     };
@@ -759,8 +904,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - FullSkills');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - FullSkills', e);
         }
         return false;
     };
@@ -799,8 +943,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Contact Info');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Contact Info', e);
         }
         return false;
     };
@@ -818,8 +961,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Basic About Me');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Basic About Me', e);
         }
         return false;
     };
@@ -835,8 +977,7 @@ window.LinkedinToResumeJson = (() => {
                 return true;
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - AdvancedAboutMe');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - AdvancedAboutMe', e);
         }
         return false;
     };
@@ -858,10 +999,41 @@ window.LinkedinToResumeJson = (() => {
                 }
             });
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager) - Recommendations');
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Recommendations', e);
         }
         return false;
+    };
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {
+        try {
+            const workResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profilePositionGroups);
+            workResponses.forEach((response) => {
+                const db = buildDbFromLiSchema(response);
+                // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
+                // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
+                // Faster to just bypass by looking up by `Position` type :)
+                db.getElementsByType('com.linkedin.voyager.dash.identity.profile.Position').forEach((position) => {
+                    parseAndPushPosition(position);
+                });
+            });
+        } catch (e) {
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Work', e);
+        }
+    };
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiEducation = async function parseViaInternalApiEducation() {
+        try {
+            // This is a really annoying lookup - I can't find a separate API endpoint, so I have to use the full-FULL (dash) profile endpoint...
+            const fullDashProfileObj = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile);
+            const db = buildDbFromLiSchema(fullDashProfileObj);
+            // Response is missing ToC, so just look up by namespace / schema
+            const eduEntries = db.getElementsByType('com.linkedin.voyager.dash.identity.profile.Education');
+            eduEntries.forEach((edu) => {
+                parseAndPushEducation(edu, db, this);
+            });
+        } catch (e) {
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Education', e);
+        }
     };
 
     LinkedinToResumeJson.prototype.parseViaInternalApi = async function parseViaInternalApi() {
@@ -906,17 +1078,16 @@ window.LinkedinToResumeJson = (() => {
                 this.debugConsole.error('Using internal API (Voyager) failed completely!');
             }
         } catch (e) {
-            console.warn(e);
-            console.log('Error parsing using internal API (Voyager)');
+            this.debugConsole.warn('Error parsing using internal API (Voyager)', e);
         }
     };
 
     /**
      * Trigger AJAX loading of content by scrolling
-     * @param {() => any} [callback]
+     * @param {boolean} [forceReScroll]
      */
-    LinkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function triggerAjaxLoadByScrolling(callback) {
-        const cb = typeof callback === 'function' ? callback : () => {};
+    LinkedinToResumeJson.prototype.triggerAjaxLoadByScrolling = async function triggerAjaxLoadByScrolling(forceReScroll = false) {
+        _scrolledToLoad = forceReScroll ? false : _scrolledToLoad;
         if (!_scrolledToLoad) {
             // Capture current location
             const startingLocY = window.scrollY;
@@ -932,12 +1103,10 @@ window.LinkedinToResumeJson = (() => {
                     window.scrollTo(0, startingLocY);
                     _scrolledToLoad = true;
                     resolve();
-                    cb();
                 }, 400);
             });
-        } else {
-            cb();
         }
+
         return true;
     };
 
@@ -952,15 +1121,73 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
+     * See if profile has changed (either URL or otherwise) since last scrape
+     * @param {string} [optLocale] preferred locale
+     * @returns {boolean} hasProfileChanged
+     */
+    LinkedinToResumeJson.prototype.getHasChangedSinceLastParse = function getHasChangedSinceLastParse(optLocale) {
+        const localeToUse = optLocale || this.preferLocale;
+        const localeStayedSame = !localeToUse || optLocale === this.lastScannedLocale;
+        const pageUrlChanged = this.scannedPageUrl === this.getUrlWithoutQuery();
+
+        return localeStayedSame && pageUrlChanged;
+    };
+
+    /**
+     * Get the LI profile response
+     * @param {boolean} useCache
+     * @param {string} [optLocale] preferred locale
+     * @returns {Promise<ParseProfileSchemaResultSummary>} profile object response summary
+     */
+    LinkedinToResumeJson.prototype.getProfileResponseSummary = async function getProfileResponseSummary(useCache = true, optLocale) {
+        const localeToUse = optLocale || this.preferLocale;
+        const localeMatchesUser = !localeToUse || optLocale === this.getViewersLocalLang();
+
+        if (this.profileParseSummary && useCache) {
+            const { pageUrl, localeStr, parseSuccess } = this.profileParseSummary;
+            const urlChanged = pageUrl !== this.getUrlWithoutQuery();
+            const langChanged = !!localeToUse && localeToUse !== localeStr;
+            if (parseSuccess && !urlChanged && !langChanged) {
+                this.debugConsole.log('getProfileResponse - Used Cache');
+                return this.profileParseSummary;
+            }
+        }
+
+        // Embedded schema can't be used for specific locales
+        if (this.preferApi === false && localeMatchesUser) {
+            await this.triggerAjaxLoadByScrolling(true);
+            await this.parseEmbeddedLiSchema();
+            if (this.parseSuccess) {
+                this.debugConsole.log('getProfileResponse - Used embedded schema. Success.');
+                return this.profileParseSummary;
+            }
+        }
+
+        // Get directly via API
+        // ....
+        const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+        // Try to use the same parser that I use for embedded
+        const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
+        if (profileParserResult.parseSuccess) {
+            this.debugConsole.log('getProfileResponse - Used API. Sucess');
+            this.profileParseSummary = profileParserResult;
+            return this.profileParseSummary;
+        }
+
+        throw new Error('Could not get profile response object');
+    };
+
+    /**
      * Try to scrape / get API and parse
      * @param {string} [optLocale]
      */
     LinkedinToResumeJson.prototype.tryParse = async function tryParse(optLocale) {
         const _this = this;
         const localeToUse = optLocale || _this.preferLocale;
-        const localeStayedSame = !localeToUse || optLocale === _this.lastScannedLocale;
-        const localeMatchesUser = !localeToUse || optLocale === _this.getViewersLocalLang();
+        const localeStayedSame = !localeToUse || localeToUse === _this.lastScannedLocale;
+        const localeMatchesUser = !localeToUse || localeToUse === _this.getViewersLocalLang();
         _this.preferLocale = localeToUse || null;
+
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve) => {
             if (_this.parseSuccess) {
@@ -975,24 +1202,27 @@ window.LinkedinToResumeJson = (() => {
                     resolve(true);
                 }
             } else {
+                // Reset output to empty template
                 _outputJson = JSON.parse(JSON.stringify(_templateJson));
-                _this.triggerAjaxLoadByScrolling(async () => {
-                    _this.parseBasics();
-                    // Embedded schema can't be used for specific locales
-                    if (_this.preferApi === false && localeMatchesUser) {
-                        _this.parseEmbeddedLiSchema();
-                        if (!_this.parseSuccess) {
-                            await _this.parseViaInternalApi();
-                        }
-                    } else {
+                // Trigger full load
+                await _this.triggerAjaxLoadByScrolling();
+                _this.parseBasics();
+                // Embedded schema can't be used for specific locales
+                if (_this.preferApi === false && localeMatchesUser) {
+                    await _this.parseEmbeddedLiSchema();
+                    if (!_this.parseSuccess) {
                         await _this.parseViaInternalApi();
-                        if (!_this.parseSuccess) {
-                            this.parseEmbeddedLiSchema();
-                        }
                     }
-                    _this.scannedPageUrl = _this.getUrlWithoutQuery();
-                    resolve(true);
-                });
+                } else {
+                    await _this.parseViaInternalApi();
+                    if (!_this.parseSuccess) {
+                        await this.parseEmbeddedLiSchema();
+                    }
+                }
+                _this.scannedPageUrl = _this.getUrlWithoutQuery();
+                _this.lastScannedLocale = localeToUse;
+                _this.debugConsole.log(_this);
+                resolve(true);
             }
         });
     };
@@ -1190,8 +1420,8 @@ window.LinkedinToResumeJson = (() => {
     LinkedinToResumeJson.prototype.getSupportedLocales = async function getSupportedLocales() {
         /** @type {string[]} */
         let supportedLocales = [];
-        await this.tryParse();
-        const profileDb = buildDbFromLiSchema(this.profileObj);
+        const { profileObj } = await this.getProfileResponseSummary();
+        const profileDb = buildDbFromLiSchema(profileObj);
         const userDetails = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
         if (userDetails && Array.isArray(userDetails['supportedLocales'])) {
             supportedLocales = userDetails.supportedLocales.map((locale) => {
@@ -1199,6 +1429,38 @@ window.LinkedinToResumeJson = (() => {
             });
         }
         return supportedLocales;
+    };
+
+    /**
+     * Get the internal URN ID of the active profile
+     *  - Not needed for JSON Resume, but for Voyager calls
+     *  - ID is also used as part of other URNs
+     * @param {boolean} [allowFetch] If DOM search fails, allow Voyager call to determine profile URN. Be careful about recursion...
+     * @returns {Promise<string>} profile URN ID
+     */
+    LinkedinToResumeJson.prototype.getProfileUrnId = async function getProfileUrnId(allowFetch = false) {
+        if (this.profileUrnId && this.scannedPageUrl === this.getUrlWithoutQuery()) {
+            return this.profileUrnId;
+        }
+
+        // Try to find in DOM
+        const urnPatt = /fsd_profile:([A-Za-z0-9-_]+)/g;
+        const matches = document.body.innerHTML.match(urnPatt);
+        if (matches && matches.length > 1) {
+            // eslint-disable-next-line prettier/prettier
+            // prettier-ignore
+            this.profileUrnId = (urnPatt.exec(matches[matches.length - 1]))[1];
+            return this.profileUrnId;
+        }
+
+        if (allowFetch) {
+            const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+            const profileDb = buildDbFromLiSchema(fullProfileView);
+            const profileViewUrnPatt = /urn:li:fs_profileView:(.+)$/i;
+            this.profileUrnId = profileDb.tableOfContents['entityUrn'].match(profileViewUrnPatt)[1];
+        }
+
+        return this.profileUrnId;
     };
 
     LinkedinToResumeJson.prototype.getDisplayPhoto = async function getDisplayPhoto() {
@@ -1209,8 +1471,8 @@ window.LinkedinToResumeJson = (() => {
             photoUrl = photoElem.src;
         } else {
             // Get via miniProfile entity in full profile db
-            await this.tryParse();
-            const profileDb = buildDbFromLiSchema(this.profileObj);
+            const { profileObj } = await this.getProfileResponseSummary();
+            const profileDb = buildDbFromLiSchema(profileObj);
             const fullProfile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
             const miniProfile = profileDb.getElementByUrn(fullProfile['*miniProfile']);
             if (miniProfile && !!miniProfile.picture) {
@@ -1224,25 +1486,10 @@ window.LinkedinToResumeJson = (() => {
         return photoUrl;
     };
 
-    /**
-     * Retrieve a LI Company Page URL from a company URN
-     * @param {string} companyUrn
-     */
-    LinkedinToResumeJson.prototype.companyLiPageFromCompanyUrn = function companyLiPageFromCompanyUrn(companyUrn) {
-        let companyPageUrl = '';
-        if (typeof companyUrn === 'string') {
-            const companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
-            if (companyIdMatch) {
-                companyPageUrl = `https://www.linkedin.com/company/${companyIdMatch[1]}`;
-            }
-        }
-        return companyPageUrl;
-    };
-
     LinkedinToResumeJson.prototype.generateVCard = async function generateVCard() {
-        await this.tryParse();
+        const { profileObj } = await this.getProfileResponseSummary();
         const contactInfoObj = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-        this.exportVCard(this.profileObj, contactInfoObj);
+        this.exportVCard(profileObj, contactInfoObj);
     };
 
     /**
@@ -1312,17 +1559,124 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     * Special - Fetch with authenticated internal API
+     *
      * @param {string} fetchEndpoint
      * @param {Record<string, string | number>} [optHeaders]
+     * @param {number} [start]
+     * @param {number} [limitPerPage]
+     * @param {number} [requestLimit]
+     * @param {number} [throttleDelayMs]
+     * @returns {Promise<LiResponse[]>} responseArr
      */
-    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint, optHeaders = {}) {
-        const _this = this;
+    LinkedinToResumeJson.prototype.voyagerFetchAutoPaginate = async function voyagerFetchAutoPaginate(
+        fetchEndpoint,
+        optHeaders = {},
+        start = 0,
+        limitPerPage = 20,
+        requestLimit = 100,
+        throttleDelayMs = 100
+    ) {
+        /** @type {LiResponse[]} */
+        const responseArr = [];
+        let url = await this.formatVoyagerUrl(fetchEndpoint);
+        let done = false;
+        let currIndex = start;
+        let requestsMade = 0;
+        /** @type {(value?: any) => void} */
+        let resolver;
+        /** @type {(reason?: any) => void} */
+        let rejector;
+
+        /**
+         * @param {any} pagingObj
+         */
+        const handlePagingData = (pagingObj) => {
+            if (pagingObj && typeof pagingObj === 'object' && 'total' in pagingObj) {
+                currIndex = pagingObj.start + pagingObj.count;
+                done = currIndex >= pagingObj.total;
+            } else {
+                done = true;
+            }
+        };
+
+        /** @param {LiResponse} liResponse */
+        const handleResponse = async (liResponse) => {
+            requestsMade++;
+            responseArr.push(liResponse);
+            handlePagingData(liResponse.data.paging);
+            if (!done && requestsMade < requestLimit) {
+                await new Promise((res) => {
+                    setTimeout(() => {
+                        res();
+                    }, throttleDelayMs);
+                });
+                url = setQueryParams(url, {
+                    start: currIndex,
+                    count: limitPerPage
+                });
+                try {
+                    const response = await this.voyagerFetch(url, optHeaders);
+                    // Recurse
+                    handleResponse(response);
+                } catch (e) {
+                    // BAIL
+                    done = true;
+                    this.debugConsole.warn(`Bailing out of auto-fetch, request failed.`, e);
+                }
+            } else {
+                done = true;
+            }
+
+            if (done) {
+                if (responseArr.length) {
+                    resolver(responseArr);
+                } else {
+                    rejector(new Error(`Failed to make any requests`));
+                }
+            }
+        };
+
+        // Start off the pagination chain
+        this.voyagerFetch(
+            setQueryParams(url, {
+                start: currIndex,
+                count: limitPerPage
+            })
+        ).then(handleResponse);
+
+        return new Promise((res, rej) => {
+            resolver = res;
+            rejector = rej;
+        });
+    };
+
+    /**
+     * Simple formatting for Voyager URLs - macro support, etc.
+     * @param {string} fetchEndpoint
+     * @returns {Promise<string>} formattedUrl
+     */
+    LinkedinToResumeJson.prototype.formatVoyagerUrl = async function formatVoyagerUrl(fetchEndpoint) {
         // Macro support
-        let endpoint = fetchEndpoint.replace('{profileId}', this.profileId);
+        let endpoint = fetchEndpoint.replace(/{profileId}/g, this.profileId);
+        if (endpoint.includes('{profileUrnId}')) {
+            const profileUrnId = await this.getProfileUrnId();
+            endpoint = endpoint.replace(/{profileUrnId}/g, profileUrnId);
+        }
         if (!endpoint.startsWith('https')) {
             endpoint = _voyagerBase + endpoint;
         }
+        return endpoint;
+    };
+
+    /**
+     * Special - Fetch with authenticated internal API
+     * @param {string} fetchEndpoint
+     * @param {Record<string, string | number>} [optHeaders]
+     * @returns {Promise<LiResponse>}
+     */
+    LinkedinToResumeJson.prototype.voyagerFetch = async function voyagerFetch(fetchEndpoint, optHeaders = {}) {
+        const _this = this;
+        const endpoint = await _this.formatVoyagerUrl(fetchEndpoint);
         // Set requested language
         let langHeaders = {};
         if (_this.preferLocale) {
@@ -1369,7 +1723,7 @@ window.LinkedinToResumeJson = (() => {
                     }
                 });
             } else {
-                resolve(false);
+                reject(new Error('Could not find valid LI cookie'));
             }
         });
     };

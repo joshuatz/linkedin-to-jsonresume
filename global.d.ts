@@ -2,6 +2,10 @@ interface GenObj {
     [k: string]: any;
 }
 
+/**
+ * LI Types
+ */
+
 type LiUrn = string;
 
 interface LiResponse {
@@ -19,15 +23,18 @@ interface LiResponse {
 interface LiPaging {
     count: number;
     start: number;
-    tota: number;
-    // Haven't actually seen this filled in with data yet...
-    links: any[];
+    total?: number;
+    $recipeTypes?: string[];
+    // I've never actually seen this property populated...
+    // This is probably actually `Array<com.linkedin.restli.common.Link>`
+    links?: string[];
 }
 
 interface LiEntity {
     $type: string;
     entityUrn: LiUrn;
     [key: string]: any;
+    paging?: LiPaging;
 }
 
 interface LiSupportedLocale {
@@ -67,6 +74,8 @@ interface InternalDb {
     entities: Array<LiEntity & {key: LiUrn}>;
     // Methods
     getElementKeys: () => string[];
+    getElements: () => Array<LiEntity & {key: LIUrn}>;
+    getValueByKey: (key: string) => LiEntity;
     getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[];
     getElementsByType: (typeStr: string) => LiEntity[];
     getElementByUrn: (urn: string) => LiEntity | undefined;
@@ -87,5 +96,29 @@ interface LiProfileContactInfoResponse extends LiResponse {
         twitterHandles: any[];
         weChatContactInfo: any;
         websites: null | LiWebsite[];
+    }
+}
+
+/**
+ * LI2JR Types
+ */
+type CaptureResult = 'success' | 'fail' | 'incomplete' | 'empty';
+
+interface ParseProfileSchemaResultSummary {
+    profileObj: LiResponse;
+    pageUrl: string;
+    localeStr?: string;
+    parseSuccess: boolean;
+    sections: {
+        basics: CaptureResult,
+        attachments: CaptureResult,
+        education: CaptureResult,
+        work: CaptureResult,
+        volunteer: CaptureResult,
+        certificates: CaptureResult,
+        skills: CaptureResult,
+        projects: CaptureResult,
+        awards: CaptureResult,
+        publications: CaptureResult
     }
 }

@@ -499,7 +499,7 @@ window.LinkedinToResumeJson = (() => {
         /** @type {ParseProfileSchemaResultSummary} */
         const resultSummary = {
             profileObj,
-            pageUrl: _this.getUrlWithoutQuery(),
+            pageUrl: null,
             parseSuccess: false,
             sections: {
                 basics: 'fail',
@@ -732,7 +732,7 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.sections.publications = publicationEntries.length ? 'success' : 'empty';
 
             if (_this.debug) {
-                console.group('parseProfileSchemaJSON complete:');
+                console.group(`parseProfileSchemaJSON complete: ${document.location.pathname}`);
                 console.log({
                     db,
                     _outputJson,
@@ -743,6 +743,7 @@ window.LinkedinToResumeJson = (() => {
 
             _this.parseSuccess = true;
             resultSummary.parseSuccess = true;
+            resultSummary.pageUrl = _this.getUrlWithoutQuery();
         } catch (e) {
             if (_this.debug) {
                 console.group('Error parsing profile schema');
@@ -1164,7 +1165,6 @@ window.LinkedinToResumeJson = (() => {
         }
 
         // Get directly via API
-        // ....
         const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
         // Try to use the same parser that I use for embedded
         const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
@@ -1454,6 +1454,8 @@ window.LinkedinToResumeJson = (() => {
             const profileDb = buildDbFromLiSchema(fullProfileView);
             const profileViewUrnPatt = /urn:li:fs_profileView:(.+)$/i;
             this.profileUrnId = profileDb.tableOfContents['entityUrn'].match(profileViewUrnPatt)[1];
+        } else {
+            this.debugConsole.warn('Could not scrape profileUrnId from DOM, but fetch is disallowed. Might be using a stale ID!');
         }
 
         return this.profileUrnId;

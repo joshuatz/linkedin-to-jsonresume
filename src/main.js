@@ -1374,7 +1374,7 @@ window.LinkedinToResumeJson = (() => {
      * Get the profile ID / User ID of the user by parsing URL first, then page.
      */
     LinkedinToResumeJson.prototype.getProfileId = function getProfileId() {
-        let profileId;
+        let profileId = '';
         const linkedProfileRegUrl = /linkedin.com\/[^\/]*\/([^\/]+)\/[^\/]*$/im;
         const linkedProfileRegApi = /voyager\/api\/.*\/profiles\/([^\/]+)\/.*/im;
         if (linkedProfileRegUrl.test(document.location.href)) {
@@ -1387,12 +1387,8 @@ window.LinkedinToResumeJson = (() => {
             profileId = linkedProfileRegApi.exec(document.body.innerHTML)[1];
         }
 
-        if (profileId) {
-            // In case username contains special characters
-            return decodeURI(profileId);
-        }
-
-        return false;
+        // In case username contains special characters
+        return decodeURI(profileId);
     };
 
     /**
@@ -1657,7 +1653,10 @@ window.LinkedinToResumeJson = (() => {
      */
     LinkedinToResumeJson.prototype.formatVoyagerUrl = async function formatVoyagerUrl(fetchEndpoint) {
         // Macro support
-        let endpoint = fetchEndpoint.replace(/{profileId}/g, this.profileId);
+        let endpoint = fetchEndpoint;
+        if (endpoint.includes('{profileId}')) {
+            endpoint = fetchEndpoint.replace(/{profileId}/g, this.getProfileId());
+        }
         if (endpoint.includes('{profileUrnId}')) {
             const profileUrnId = await this.getProfileUrnId();
             endpoint = endpoint.replace(/{profileUrnId}/g, profileUrnId);

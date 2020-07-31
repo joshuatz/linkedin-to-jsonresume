@@ -2,6 +2,7 @@
     "name": "linkedin-to-json-resume-exporter",
     "version": "1.4.0",
     "description": "Browser tool to grab details from your open LinkedIn profile page and export to JSON Resume Schema",
+    "private": true,
     "main": "src/main.js",
     "scripts": {
         "test": "\"Error: no test specified\" && exit 1",
@@ -11,7 +12,8 @@
         "build-bookmarklet": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/build-bookmarklet.js",
         "build-browserext": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/prep-browserext.js",
         "build-browserext-debug": "node ./build-scripts/prep-dirs.js && npm run webpack-debug && node ./build-scripts/prep-browserext.js",
-        "package-browserext": "node ./build-scripts/prep-dirs.js && npm run build-browserext && node ./build-scripts/package-browserext.js"
+        "package-browserext": "node ./build-scripts/prep-dirs.js && npm run build-browserext && node ./build-scripts/package-browserext.js",
+        "copy-debug-js-win": "yarn build-browserext-debug && less build/main.js | CLIP"
     },
     "author": "Joshua Tzucker",
     "license": "MIT",

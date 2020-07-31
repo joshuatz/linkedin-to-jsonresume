@@ -102,6 +102,16 @@ If this ever garners enough interest and needs to be updated, I will probably wa
 ### LinkedIn Documentation
 For understanding some peculiarities of the LI API, see [LinkedIn-Notes.md](./LinkedIn-Notes.md).
 
+### Debugging
+Debugging the extension is a little cumbersome, because of the way Chrome sandboxes extension scripts and how code has to be injected. An alternative to setting breakpoints in the extension code itself, is to copy the output of `/build/main.js` and run it via the console.
+
+```js
+li2jr = new LinkedinToResumeJson(true, true);
+li2jr.parseAndShowOutput();
+```
+
+> Even if you have the repo inside of a local static server, you can't inject it via a script tag or fetch & eval, due to LI's restrictive CSP.
+
 ---
 
 ## DISCLAIMER:

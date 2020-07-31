@@ -488,7 +488,7 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
-     *
+     * Main parser for giant profile JSON block
      * @param {LinkedinToResumeJson} instance
      * @param {LiResponse} profileObj
      */
@@ -518,7 +518,9 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.localeStr = _this.preferLocale;
         }
         try {
+            // Build db object
             const db = buildDbFromLiSchema(profileObj);
+
             // Parse basics / profile
             let profileGrabbed = false;
             db.getValuesByKey(_liSchemaKeys.profile).forEach((profile) => {
@@ -869,8 +871,9 @@ window.LinkedinToResumeJson = (() => {
             if (fullProfileView && typeof fullProfileView.data === 'object') {
                 // Try to use the same parser that I use for embedded
                 const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
+                this.debugConsole.log(`Parse full profile via internal API, success = ${profileParserResult.parseSuccess}`);
                 if (profileParserResult.parseSuccess) {
-                    this.debugConsole.log('Was able to parse full profile via internal API');
+                    this.profileParseSummary = profileParserResult;
                 }
                 // Some sections might require additional fetches to fill missing data
                 if (profileParserResult.sections.work === 'incomplete') {
@@ -1193,11 +1196,11 @@ window.LinkedinToResumeJson = (() => {
             if (_this.parseSuccess) {
                 if (_this.scannedPageUrl === _this.getUrlWithoutQuery() && localeStayedSame) {
                     // No need to reparse!
-                    this.debugConsole.log('Skipped re-parse; page has not changed');
+                    _this.debugConsole.log('Skipped re-parse; page has not changed');
                     resolve(true);
                 } else {
                     // Parse already done, but page changed (ajax)
-                    this.debugConsole.warn('Re-parsing for new results; page has changed between scans');
+                    _this.debugConsole.warn('Re-parsing for new results; page has changed between scans');
                     await _this.forceReParse(localeToUse);
                     resolve(true);
                 }
@@ -1216,7 +1219,7 @@ window.LinkedinToResumeJson = (() => {
                 } else {
                     await _this.parseViaInternalApi();
                     if (!_this.parseSuccess) {
-                        await this.parseEmbeddedLiSchema();
+                        await _this.parseEmbeddedLiSchema();
                     }
                 }
                 _this.scannedPageUrl = _this.getUrlWithoutQuery();
@@ -1431,31 +1434,41 @@ window.LinkedinToResumeJson = (() => {
      * Get the internal URN ID of the active profile
      *  - Not needed for JSON Resume, but for Voyager calls
      *  - ID is also used as part of other URNs
-     * @param {boolean} [allowFetch] If DOM search fails, allow Voyager call to determine profile URN. Be careful about recursion...
+     * @param {boolean} [allowFetch] If DOM search fails, allow Voyager call to determine profile URN.
      * @returns {Promise<string>} profile URN ID
      */
-    LinkedinToResumeJson.prototype.getProfileUrnId = async function getProfileUrnId(allowFetch = false) {
+    LinkedinToResumeJson.prototype.getProfileUrnId = async function getProfileUrnId(allowFetch = true) {
+        const profileViewUrnPatt = /urn:li:fs_profileView:(.+)$/i;
+
         if (this.profileUrnId && this.scannedPageUrl === this.getUrlWithoutQuery()) {
             return this.profileUrnId;
         }
 
-        // Try to find in DOM
-        const urnPatt = /fsd_profile:([A-Za-z0-9-_]+)/g;
+        // Try to use cache
+        if (this.profileParseSummary && this.profileParseSummary.parseSuccess) {
+            const profileDb = buildDbFromLiSchema(this.profileParseSummary.profileObj);
+            this.profileUrnId = profileDb.tableOfContents['entityUrn'].match(profileViewUrnPatt)[1];
+            return this.profileUrnId;
+        }
+
+        const endpoint = _voyagerEndpoints.fullProfileView;
+        // Make a new API call to get ID - be wary of recursive calls
+        if (allowFetch && !endpoint.includes(`{profileUrnId}`)) {
+            const fullProfileView = await this.voyagerFetch(endpoint);
+            const profileDb = buildDbFromLiSchema(fullProfileView);
+            this.profileUrnId = profileDb.tableOfContents['entityUrn'].match(profileViewUrnPatt)[1];
+            return this.profileUrnId;
+        }
+        this.debugConsole.warn('Could not scrape profileUrnId from cache, but fetch is disallowed. Might be using a stale ID!');
+
+        // Try to find in DOM, as last resort
+        const urnPatt = /miniprofiles\/([A-Za-z0-9-_]+)/g;
         const matches = document.body.innerHTML.match(urnPatt);
         if (matches && matches.length > 1) {
             // eslint-disable-next-line prettier/prettier
             // prettier-ignore
             this.profileUrnId = (urnPatt.exec(matches[matches.length - 1]))[1];
             return this.profileUrnId;
-        }
-
-        if (allowFetch) {
-            const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
-            const profileDb = buildDbFromLiSchema(fullProfileView);
-            const profileViewUrnPatt = /urn:li:fs_profileView:(.+)$/i;
-            this.profileUrnId = profileDb.tableOfContents['entityUrn'].match(profileViewUrnPatt)[1];
-        } else {
-            this.debugConsole.warn('Could not scrape profileUrnId from DOM, but fetch is disallowed. Might be using a stale ID!');
         }
 
         return this.profileUrnId;

@@ -57,6 +57,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+7/31/2020 | 1.4.1 | Fix: In some cases, wrong profileUrnId was extracted from current profile, which led to work history API call being ran against a *different* profile (e.g. from "recommended section", or something like that).
 7/21/2020 | 1.4.0 | Fix: For vCard exports, Previous profile was getting grabbed after SPA navigation between profiles.
 7/6/2020 | 1.3.0 | Fix: Incomplete work position entries for some users; LI was limiting the amount of pre-fetched data. Had to implement request paging to fix.<br/><br/>Also refactored a lot of code, improved result caching, and other tweaks.
 6/18/2020 | 1.2.0 | Fix / Improve VCard export feature.

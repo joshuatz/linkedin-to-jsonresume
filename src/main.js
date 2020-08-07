@@ -307,6 +307,9 @@ window.LinkedinToResumeJson = (() => {
         db.getElementByUrn = function getElementByUrn(urn) {
             return db.entitiesByUrn[urn];
         };
+        db.getElementsByUrns = function getElementsByUrns(urns) {
+            return urns.map((urn) => db.entitiesByUrn[urn]);
+        };
         db.getValueByKey = function getValueByKey(key) {
             return db.entitiesByUrn[db.tableOfContents[key]];
         };
@@ -1015,9 +1018,21 @@ window.LinkedinToResumeJson = (() => {
                 const db = buildDbFromLiSchema(response);
                 // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
                 // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
-                // Faster to just bypass by looking up by `Position` type :)
-                db.getElementsByType('com.linkedin.voyager.dash.identity.profile.Position').forEach((position) => {
-                    parseAndPushPosition(position);
+                // You can bypass by looking up by `Position` type, but then original ordering is not preserved
+                db.getElements().forEach((positionGroup) => {
+                    // This element is how LI groups positions
+                    // - E.g. promotions within same company are all grouped
+                    // - Instead of storing *elements (positions) directly,
+                    // there is a pointer to a "collection" that has to be followed
+                    // - This multi-level traversal within the LI response could
+                    // probably be refactored into a `db.*` method.
+                    const collectionResponse = db.getElementByUrn(positionGroup['*profilePositionInPositionGroup']);
+                    if (collectionResponse && Array.isArray(collectionResponse['*elements'])) {
+                        db.getElementsByUrns(collectionResponse['*elements']).forEach((position) => {
+                            // This is *finally* the "Position" element
+                            parseAndPushPosition(position);
+                        });
+                    }
                 });
             });
         } catch (e) {

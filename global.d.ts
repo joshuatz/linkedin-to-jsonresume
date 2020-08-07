@@ -79,6 +79,10 @@ interface InternalDb {
     getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[];
     getElementsByType: (typeStr: string) => LiEntity[];
     getElementByUrn: (urn: string) => LiEntity | undefined;
+    /**
+     * Get multiple elements by URNs
+     */
+    getElementsByUrns: (urns: string[]) => LiEntity[];
 }
 
 interface LiProfileContactInfoResponse extends LiResponse {

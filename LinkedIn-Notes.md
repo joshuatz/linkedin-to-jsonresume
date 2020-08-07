@@ -64,5 +64,17 @@ type PagingInfo = {
 ### Dash Endpoint(s)
 As a quick side-note, I've noticed that a lot of the endpoints with `dash` anywhere in the path use the newer `decorationId` query syntax. This seems to also correspond with a shift in LI's UI towards true SPA functionality, where more of the page is lazy-loaded with filtered data that is slotted into Ember JS templates.
 
+### Voyager Responses and Nested Data
+Here are some quick notes on Voyager responses and how data is grouped / nested:
+
+ - *Elements* can be nested several layers deep; you might have an initial collection of elements, where each sub-element is actually a group that contains pointer to further collections of elements
+     - If you want to get the final layer of elements, you have to be careful about how you get them
+        - If you simply filter by `$type`, you are going to get elements out of order, and LI does not provide indexes (typically) on elements
+        - The only way to preserve the true order (which will match the rendered result on LI) is to traverse through levels
+     - Currently, `com.linkedin.restli.common.CollectionResponse` seems to be used for each layer where the element is a collection that points to sub elements (under `*elements`) key
+     - This can also make paging a little messy.
+ - LI has limits on certain endpoints, and the amount of nested elements it will return
+     - See [PR #23](https://github.com/joshuatz/linkedin-to-jsonresume/pull/23) for an example of how this was implemented
+
 ## LinkedIn TS Types
 I've put some basics LI types in my `global.d.ts`. Eventually, it would be nice to re-write the core of this project as TS, as opposed to the current VSCode-powered typed JS approached.

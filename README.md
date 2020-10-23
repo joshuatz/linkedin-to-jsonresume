@@ -57,6 +57,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+10/22/2020 | 1.5.0 | Fix: Incorrect birthday month in exported vCards (off by one)<br>Fix: Better pattern for extracting profile ID from URL, fixes extracting from virtual sub-pages of profile (e.g. `/detail/contact-info`), or with query or hash strings at the end.
 7/7/2020 | 1.4.2 | Fix: For work positions, if fetched via `profilePositionGroups`, LI ordering (the way it looks on your profile) was not being preserved.
 7/31/2020 | 1.4.1 | Fix: In some cases, wrong profileUrnId was extracted from current profile, which led to work history API call being ran against a *different* profile (e.g. from "recommended section", or something like that).
 7/21/2020 | 1.4.0 | Fix: For vCard exports, Previous profile was getting grabbed after SPA navigation between profiles.
@@ -113,6 +114,8 @@ li2jr.parseAndShowOutput();
 ```
 
 > Even if you have the repo inside of a local static server, you can't inject it via a script tag or fetch & eval, due to LI's restrictive CSP.
+
+If you do want to find the actual injected code of the extension in Chrome dev tools, you should be able to find it under `Sources -> Content Scripts -> top -> JSON Resume Exporter -> {main.js}`
 
 ---
 

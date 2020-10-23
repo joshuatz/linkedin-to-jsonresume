@@ -104,9 +104,20 @@ window.LinkedinToResumeJson = (() => {
     /**
      * Parses an object with year, month and day and returns a string with the date.
      * If month is not present, should return 12, and if day is not present, should return last month day.
-     * @param {{year: number, month?: number, day?: number}} dateObj
+     * @param {LiDate} dateObj
+     * @returns {string} Date, as string, formatted for JSONResume
      */
     const parseDate = (dateObj) => (dateObj && dateObj.year ? `${dateObj.year}-${getMonth(dateObj.month)}-${getDay(dateObj.day, dateObj.month)}` : '');
+
+    /**
+     * Converts a LI Voyager style date object into a native JS Date object
+     * @param {LiDate} liDateObj
+     * @returns {Date} date object
+     */
+    const liDateToJSDate = (liDateObj) => {
+        // This is a cheat; by passing string + 00:00, we can force Date to not offset (by timezone), and also treat month as NOT zero-indexed, which is how LI uses it
+        return new Date(`${parseDate(liDateObj)} 00:00`);
+    };
 
     /**
      * Trigger a file download prompt with given content
@@ -1393,7 +1404,7 @@ window.LinkedinToResumeJson = (() => {
      */
     LinkedinToResumeJson.prototype.getProfileId = function getProfileId() {
         let profileId = '';
-        const linkedProfileRegUrl = /linkedin.com\/[^\/]*\/([^\/]+)\/[^\/]*$/im;
+        const linkedProfileRegUrl = /linkedin.com\/in\/([^\/?#]+)[\/?#]?.*$/im;
         const linkedProfileRegApi = /voyager\/api\/.*\/profiles\/([^\/]+)\/.*/im;
         if (linkedProfileRegUrl.test(document.location.href)) {
             profileId = linkedProfileRegUrl.exec(document.location.href)[1];
@@ -1555,7 +1566,7 @@ window.LinkedinToResumeJson = (() => {
         }
         if (profile.birthDate && 'day' in profile.birthDate) {
             const birthdayLi = /** @type {LiDate} */ (profile.birthDate);
-            vCard.birthday = new Date(birthdayLi.year, birthdayLi.month, birthdayLi.day);
+            vCard.birthday = liDateToJSDate(birthdayLi);
         }
         // Try to get currently employed organization
         const positions = profileDb.getValuesByKey(_liSchemaKeys.workPositions);

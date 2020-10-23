@@ -43,6 +43,9 @@ interface LiSupportedLocale {
     $type: string;
 }
 
+/**
+ * ! WARNING ! - Month and day are *not* zero-indexed. E.g. "Feb" is represented as `2`, not `1`
+ */
 interface LiDate {
     month?: number;
     day?: number;

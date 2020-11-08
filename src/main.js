@@ -68,37 +68,42 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     * Checks if value passed is a one digit number
-     * @param {Number} v
+     * If less than 10, zero pad left
+     * @param {number} n - Numerical input
+     * @returns {string} Left padded, stringified num
      */
-    const isOneDigit = (v) => Number(v) < 10;
-
-    /**
-     * Returns month. If it is only one digit, adds a 0 and returns it as a string.
-     * @param {Number} [m] month
-     */
-    const getMonth = (m) => {
-        if (!m) return 12;
-        if (isOneDigit(m)) {
-            return `0${m}`;
+    const zeroLeftPad = (n) => {
+        if (n < 10) {
+            return `0${n}`;
         }
-        return m;
+
+        return n.toString();
     };
 
     /**
-     * Gets day.
+     * Returns month, padded to two digits
+     * @param {Number} [m] month
+     * @returns {string} month, padded to two digits
+     */
+    const getMonth = (m) => {
+        if (!m) return `12`;
+
+        return zeroLeftPad(m);
+    };
+
+    /**
+     * Gets day, padded to two digits
      * @param {Number} d day
      * @param {Number} m month
+     * @returns {string} day, padded to two digits
      */
     const getDay = (d, m) => {
         if (!d) {
-            if (!m) return 31;
-            return maxDaysOfMonth[m];
+            if (!m) return `31`;
+            return maxDaysOfMonth[m].toString();
         }
-        if (isOneDigit(d)) {
-            return `0${d}`;
-        }
-        return d;
+
+        return zeroLeftPad(d);
     };
 
     /**
@@ -1564,9 +1569,22 @@ window.LinkedinToResumeJson = (() => {
                 }
             });
         }
-        if (profile.birthDate && 'day' in profile.birthDate) {
+        // At a minimum, we need month and day in order to include BDAY
+        if (profile.birthDate && 'day' in profile.birthDate && 'month' in profile.birthDate) {
             const birthdayLi = /** @type {LiDate} */ (profile.birthDate);
-            vCard.birthday = liDateToJSDate(birthdayLi);
+            if (!birthdayLi.year) {
+                /**
+                 * Users can choose to OMIT their birthyear, but leave month and day (thus hiding age)
+                 * - vCard actually allows this in spec, but only in > v4 (RFC-6350): https://tools.ietf.org/html/rfc6350#:~:text=BDAY%3A--0415, https://tools.ietf.org/html/rfc6350#section-4.3.1
+                 *       - Governed by ISO-8601, which allows truncated under ISO.8601.2000, such as `--MMDD`
+                 *       - Example: `BDAY:--0415`
+                 * - Since the vCard library I'm using (many platforms) only support V3, I'll just exclude it from the vCard; including a partial date in v3 (violating the spec) will result in a corrupt card that will crash many programs
+                 */
+                console.warn(`Warning: User has a "partial" birthdate (year is omitted). This is not supported in vCard version 3 or under.`);
+            } else {
+                // Full birthday (can be used for age)
+                vCard.birthday = liDateToJSDate(birthdayLi);
+            }
         }
         // Try to get currently employed organization
         const positions = profileDb.getValuesByKey(_liSchemaKeys.workPositions);

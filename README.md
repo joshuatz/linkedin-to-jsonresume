@@ -62,6 +62,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+11/8/2020 | 1.5.1 | Fix: Omit partial BDAY export in vCard ([#32](https://github.com/joshuatz/linkedin-to-jsonresume/issues/32))
 10/22/2020 | 1.5.0 | Fix: Incorrect birthday month in exported vCards (off by one)<br>Fix: Better pattern for extracting profile ID from URL, fixes extracting from virtual sub-pages of profile (e.g. `/detail/contact-info`), or with query or hash strings at the end.
 7/7/2020 | 1.4.2 | Fix: For work positions, if fetched via `profilePositionGroups`, LI ordering (the way it looks on your profile) was not being preserved.
 7/31/2020 | 1.4.1 | Fix: In some cases, wrong profileUrnId was extracted from current profile, which led to work history API call being ran against a *different* profile (e.g. from "recommended section", or something like that).

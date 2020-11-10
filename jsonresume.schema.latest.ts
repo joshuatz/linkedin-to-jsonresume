@@ -1,4 +1,8 @@
-
+/**
+ * @file Represents the latest version of the schema that I'm willing to support / implement
+ * @see https://github.com/joshuatz/linkedin-to-jsonresume/issues/33
+ */
+import {Iso8601} from './jsonresume.schema.stable';
 
 // https://github.com/jsonresume/resume-schema/pull/340
 export interface Certificate {
@@ -9,7 +13,7 @@ export interface Certificate {
     /**
      * e.g. 1989-06-12
      */
-    date?: string;
+    date?: Iso8601;
     /**
      * e.g. http://example.com
      */

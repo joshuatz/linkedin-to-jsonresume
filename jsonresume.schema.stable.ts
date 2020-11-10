@@ -2,6 +2,7 @@
  * @file Generated (and hand-modified) TS definition for JSON Resume Schema
  *  - Locked to v0.0.16, @see https://github.com/joshuatz/linkedin-to-jsonresume/issues/33
  * @see https://github.com/jsonresume/resume-schema/blob/v0.0.16/schema.json
+ *  - Permalink of above: https://github.com/jsonresume/resume-schema/blob/a6d1ae5c990e3370de6ca305ef32477b9516391b/schema.json
  */
 
 /**
@@ -39,7 +40,7 @@ export interface Basics {
      */
     label?:    string;
     location?: Location;
-    name?:     string;
+    name:     string;
     /**
      * Phone numbers are stored as strings so use any format you like, e.g. 712-117-2923
      */
@@ -257,7 +258,7 @@ export interface Work {
     website?: string;
 }
 
-export interface ResumeSchema {
+export interface ResumeSchemaStable {
     /**
      * Specify any awards you have received throughout your professional career
      */

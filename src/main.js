@@ -8,7 +8,10 @@
 const VCardsJS = require('@dan/vcards');
 
 /**
- * @typedef {import("../jsonresume.schema").ResumeSchema & Partial<import('../jsonresume.schema.beyond').ResumeSchemaBeyondCurrentSpec>} ResumeSchema
+ * @typedef {import('../jsonresume.schema.stable').ResumeSchemaStable} ResumeSchemaStable
+ * @typedef {import('../jsonresume.schema.latest').ResumeSchemaLatest} ResumeSchemaLatest
+ * @typedef {import('../jsonresume.schema.latest').ResumeSchemaBeyondSpec} ResumeSchemaBeyondSpec
+ * @typedef {'stable' | 'latest' | 'beta'} SchemaVersion
  */
 
 // ==Bookmarklet==
@@ -16,8 +19,38 @@ const VCardsJS = require('@dan/vcards');
 // @author Joshua Tzucker
 // ==/Bookmarklet==
 
-/** @type {ResumeSchema} */
-const resumeJsonTemplate = {
+/** @type {Required<ResumeSchemaStable>} */
+const resumeJsonTemplateStable = {
+    basics: {
+        name: '',
+        label: '',
+        picture: '',
+        email: '',
+        phone: '',
+        website: '',
+        summary: '',
+        location: {
+            address: '',
+            postalCode: '',
+            city: '',
+            countryCode: '',
+            region: ''
+        },
+        profiles: []
+    },
+    work: [],
+    volunteer: [],
+    education: [],
+    awards: [],
+    publications: [],
+    skills: [],
+    languages: [],
+    interests: [],
+    references: []
+};
+
+/** @type {Required<ResumeSchemaLatest>} */
+const resumeJsonTemplateLatest = {
     $schema: 'https://json.schemastore.org/resume',
     basics: {
         name: '',
@@ -45,7 +78,11 @@ const resumeJsonTemplate = {
     languages: [],
     interests: [],
     references: [],
-    projects: []
+    projects: [],
+    meta: {
+        version: 'v0.1.3',
+        canonical: 'https://github.com/jsonresume/resume-schema/blob/v0.1.3/schema.json'
+    }
 };
 
 // @ts-ignore
@@ -151,9 +188,12 @@ window.LinkedinToResumeJson = (() => {
         document.body.removeChild(a);
     };
 
-    /** @type {ResumeSchema} */
-    let _outputJson = JSON.parse(JSON.stringify(resumeJsonTemplate));
-    const _templateJson = resumeJsonTemplate;
+    /** @type {resumeJsonTemplateStable} */
+    let _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
+    /** @type {ResumeSchemaLatest} */
+    let _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
+    const _templateJsonStable = resumeJsonTemplateStable;
+    const _templateJsonLatest = resumeJsonTemplateLatest;
     const _liSchemaKeys = {
         profile: '*profile',
         certificates: '*certificationView',
@@ -252,6 +292,19 @@ window.LinkedinToResumeJson = (() => {
     function noNullOrUndef(value, optDefaultVal) {
         const defaultVal = optDefaultVal || '';
         return typeof value === 'undefined' || value === null ? defaultVal : value;
+    }
+
+    /**
+     * Copy with `json.parse(json.stringify())`
+     * @template T
+     * @param {T & Record<string, any>} inputObj
+     * @param {Array<keyof T>} [removeKeys] properties (top-level only) to remove
+     * @returns {T}
+     */
+    function lazyCopy(inputObj, removeKeys = []) {
+        const copied = JSON.parse(JSON.stringify(inputObj));
+        removeKeys.forEach((k) => delete copied[k]);
+        return copied;
     }
 
     /**
@@ -409,13 +462,17 @@ window.LinkedinToResumeJson = (() => {
      */
     function pushSkill(skillName) {
         // Try to prevent duplicate skills
-        const skillNames = _outputJson.skills.map((skill) => skill.name);
+        // Both stable and latest use same spec
+        const skillNames = _outputJsonStable.skills.map((skill) => skill.name);
         if (skillNames.indexOf(skillName) === -1) {
-            _outputJson.skills.push({
+            /** @type {ResumeSchemaStable['skills'][0]} */
+            const formattedSkill = {
                 name: skillName,
                 level: '',
                 keywords: []
-            });
+            };
+            _outputJsonStable.skills.push(formattedSkill);
+            _outputJsonLatest.skills.push(formattedSkill);
         }
     }
 
@@ -454,7 +511,7 @@ window.LinkedinToResumeJson = (() => {
     function parseAndPushEducation(educationObj, db, instance) {
         const _this = instance;
         const edu = educationObj;
-        /** @type {ResumeSchema['education'][0]} */
+        /** @type {ResumeSchemaStable['education'][0]} */
         const parsedEdu = {
             institution: noNullOrUndef(edu.schoolName),
             area: noNullOrUndef(edu.fieldOfStudy),
@@ -477,7 +534,9 @@ window.LinkedinToResumeJson = (() => {
             });
         }
         // Push to final json
-        _outputJson.education.push(parsedEdu);
+        _outputJsonStable.education.push(parsedEdu);
+        // Currently, same schema can be re-used; only difference is URL, which I'm not including
+        _outputJsonLatest.education.push(parsedEdu);
     }
 
     /**
@@ -485,15 +544,15 @@ window.LinkedinToResumeJson = (() => {
      * @param {LiEntity} positionObj
      */
     function parseAndPushPosition(positionObj) {
-        /** @type {ResumeSchema['work'][0]} */
+        /** @type {ResumeSchemaStable['work'][0]} */
         const parsedWork = {
-            name: positionObj.companyName,
+            company: positionObj.companyName,
             endDate: '',
             highlights: [],
             position: positionObj.title,
             startDate: '',
             summary: positionObj.description,
-            url: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
+            website: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
         };
         parseAndAttachResumeDates(parsedWork, positionObj);
         // Lookup company website
@@ -503,7 +562,17 @@ window.LinkedinToResumeJson = (() => {
         }
 
         // Push to final json
-        _outputJson.work.push(parsedWork);
+        _outputJsonStable.work.push(parsedWork);
+        _outputJsonLatest.work.push({
+            name: parsedWork.company,
+            // This is description of company, not position
+            // description: '',
+            startDate: parsedWork.startDate,
+            endDate: parsedWork.endDate,
+            highlights: parsedWork.highlights,
+            summary: parsedWork.summary,
+            url: parsedWork.website
+        });
     }
 
     /**
@@ -546,19 +615,35 @@ window.LinkedinToResumeJson = (() => {
                 // There should only be one
                 if (!profileGrabbed) {
                     profileGrabbed = true;
-                    _outputJson.basics.name = `${profile.firstName} ${profile.lastName}`;
-                    _outputJson.basics.summary = noNullOrUndef(profile.summary);
-                    _outputJson.basics.label = noNullOrUndef(profile.headline);
+                    /** @type {ResumeSchemaStable['basics']} */
+                    const formattedProfileObj = {
+                        name: `${profile.firstName} ${profile.lastName}`,
+                        summary: noNullOrUndef(profile.summary),
+                        label: noNullOrUndef(profile.headline),
+                        location: {
+                            countryCode: profile.defaultLocale.country
+                        }
+                    };
                     if (profile.address) {
-                        _outputJson.basics.location.address = noNullOrUndef(profile.address);
+                        formattedProfileObj.location.address = noNullOrUndef(profile.address);
                     } else if (profile.locationName) {
-                        _outputJson.basics.location.address = noNullOrUndef(profile.locationName);
+                        formattedProfileObj.location.address = noNullOrUndef(profile.locationName);
                     }
-                    _outputJson.basics.location.countryCode = profile.defaultLocale.country;
-                    _outputJson.languages.push({
+                    _outputJsonStable.basics = {
+                        ..._outputJsonStable.basics,
+                        ...formattedProfileObj
+                    };
+                    _outputJsonLatest.basics = {
+                        ..._outputJsonLatest.basics,
+                        ...formattedProfileObj
+                    };
+                    /** @type {ResumeSchemaStable['languages'][0]} */
+                    const formatttedLang = {
                         language: profile.defaultLocale.language,
                         fluency: 'Native Speaker'
-                    });
+                    };
+                    _outputJsonStable.languages.push(formatttedLang);
+                    _outputJsonLatest.languages.push(formatttedLang);
                     resultSummary.sections.basics = 'success';
                 }
             });
@@ -573,23 +658,26 @@ window.LinkedinToResumeJson = (() => {
                     if (usernameMatch && !foundGithub) {
                         foundGithub = true;
                         captured = true;
-                        _outputJson.basics.profiles.push({
+                        const formattedProfile = {
                             network: 'GitHub',
                             username: usernameMatch[1],
                             url
-                        });
+                        };
+                        _outputJsonStable.basics.profiles.push(formattedProfile);
+                        _outputJsonLatest.basics.profiles.push(formattedProfile);
                     }
                 }
                 // Since most people put potfolio as first link, guess that it will be
                 if (!captured && !foundPortfolio) {
                     captured = true;
-                    _outputJson.basics.url = url;
+                    _outputJsonStable.basics.website = url;
+                    _outputJsonLatest.basics.url = url;
                 }
                 // Finally, put in projects if not yet categorized
-                if (!captured && _this.exportBeyondSpec) {
+                if (!captured) {
                     captured = true;
-                    _outputJson.projects = _outputJson.projects || [];
-                    _outputJson.projects.push({
+                    _outputJsonLatest.projects = _outputJsonLatest.projects || [];
+                    _outputJsonLatest.projects.push({
                         name: attachment.title,
                         startDate: '',
                         endDate: '',
@@ -642,11 +730,11 @@ window.LinkedinToResumeJson = (() => {
             // Parse volunteer experience
             const volunteerEntries = db.getValuesByKey(_liSchemaKeys.volunteerWork);
             volunteerEntries.forEach((volunteering) => {
-                /** @type {ResumeSchema['volunteer'][0]} */
+                /** @type {ResumeSchemaStable['volunteer'][0]} */
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
                     position: volunteering.role,
-                    url: companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                    website: companyLiPageFromCompanyUrn(volunteering['companyUrn']),
                     startDate: '',
                     endDate: '',
                     summary: volunteering.description,
@@ -655,7 +743,11 @@ window.LinkedinToResumeJson = (() => {
                 parseAndAttachResumeDates(parsedVolunteerWork, volunteering);
 
                 // Push to final json
-                _outputJson.volunteer.push(parsedVolunteerWork);
+                _outputJsonStable.volunteer.push(parsedVolunteerWork);
+                _outputJsonLatest.volunteer.push({
+                    ...lazyCopy(parsedVolunteerWork, ['website']),
+                    url: parsedVolunteerWork.website
+                });
             });
             resultSummary.sections.volunteer = volunteerEntries.length ? 'success' : 'empty';
 
@@ -668,9 +760,10 @@ window.LinkedinToResumeJson = (() => {
              * @see https://github.com/jsonresume/resume-schema/pull/340
              */
             if (_this.exportBeyondSpec) {
-                _outputJson.certificates = [];
+                /** @type {ResumeSchemaBeyondSpec['certificates']} */
+                const certificates = [];
                 db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
-                    /** @type {ResumeSchema['certificates'][0]} */
+                    /** @type {ResumeSchemaBeyondSpec['certificates'][0]} */
                     const certObj = {
                         title: cert.name,
                         issuer: cert.authority
@@ -679,9 +772,11 @@ window.LinkedinToResumeJson = (() => {
                     if (typeof cert.url === 'string' && cert.url) {
                         certObj.url = cert.url;
                     }
-                    _outputJson.certificates.push(certObj);
+                    certificates.push(certObj);
                 });
-                resultSummary.sections.certificates = _outputJson.certificates.length ? 'success' : 'empty';
+                resultSummary.sections.certificates = certificates.length ? 'success' : 'empty';
+                // @ts-ignore
+                _outputJsonLatest.certificates = certificates;
             }
 
             // Parse skills
@@ -705,7 +800,7 @@ window.LinkedinToResumeJson = (() => {
             // Parse projects
             // Not currently used by Resume JSON
             if (_this.exportBeyondSpec) {
-                _outputJson.projects = _outputJson.projects || [];
+                _outputJsonLatest.projects = _outputJsonLatest.projects || [];
                 db.getValuesByKey(_liSchemaKeys.projects).forEach((project) => {
                     const parsedProject = {
                         name: project.title,
@@ -714,14 +809,15 @@ window.LinkedinToResumeJson = (() => {
                         url: project.url
                     };
                     parseAndAttachResumeDates(parsedProject, project);
-                    _outputJson.projects.push(parsedProject);
+                    _outputJsonLatest.projects.push(parsedProject);
                 });
-                resultSummary.sections.projects = _outputJson.projects.length ? 'success' : 'empty';
+                resultSummary.sections.projects = _outputJsonLatest.projects.length ? 'success' : 'empty';
             }
 
             // Parse awards
             const awardEntries = db.getValuesByKey(_liSchemaKeys.awards);
             awardEntries.forEach((award) => {
+                /** @type {ResumeSchemaStable['awards'][0]} */
                 const parsedAward = {
                     title: award.title,
                     date: '',
@@ -731,13 +827,15 @@ window.LinkedinToResumeJson = (() => {
                 if (award.issueDate && typeof award.issueDate === 'object') {
                     parsedAward.date = parseDate(award.issueDate);
                 }
-                _outputJson.awards.push(parsedAward);
+                _outputJsonStable.awards.push(parsedAward);
+                _outputJsonLatest.awards.push(parsedAward);
             });
             resultSummary.sections.awards = awardEntries.length ? 'success' : 'empty';
 
             // Parse publications
             const publicationEntries = db.getValuesByKey(_liSchemaKeys.publications);
             publicationEntries.forEach((publication) => {
+                /** @type {ResumeSchemaStable['publications'][0]} */
                 const parsedPublication = {
                     name: publication.name,
                     publisher: publication.publisher,
@@ -748,7 +846,11 @@ window.LinkedinToResumeJson = (() => {
                 if (publication.date && typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
                     parsedPublication.releaseDate = parseDate(publication.date);
                 }
-                _outputJson.publications.push(parsedPublication);
+                _outputJsonStable.publications.push(parsedPublication);
+                _outputJsonLatest.publications.push({
+                    ...lazyCopy(parsedPublication, ['website']),
+                    url: parsedPublication.website
+                });
             });
             resultSummary.sections.publications = publicationEntries.length ? 'success' : 'empty';
 
@@ -756,7 +858,8 @@ window.LinkedinToResumeJson = (() => {
                 console.group(`parseProfileSchemaJSON complete: ${document.location.pathname}`);
                 console.log({
                     db,
-                    _outputJson,
+                    _outputJsonStable,
+                    _outputJsonLatest,
                     resultSummary
                 });
                 console.groupEnd();
@@ -876,11 +979,13 @@ window.LinkedinToResumeJson = (() => {
     // This should be called every time
     LinkedinToResumeJson.prototype.parseBasics = function parseBasics() {
         this.profileId = this.getProfileId();
-        _outputJson.basics.profiles.push({
+        const formattedProfile = {
             network: 'LinkedIn',
             username: this.profileId,
             url: `https://www.linkedin.com/in/${this.profileId}/`
-        });
+        };
+        _outputJsonStable.basics.profiles.push(formattedProfile);
+        _outputJsonLatest.basics.profiles.push(formattedProfile);
     };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiFullProfile = async function parseViaInternalApiFullProfile() {
@@ -896,14 +1001,19 @@ window.LinkedinToResumeJson = (() => {
                 }
                 // Some sections might require additional fetches to fill missing data
                 if (profileParserResult.sections.work === 'incomplete') {
-                    _outputJson.work = [];
+                    _outputJsonStable.work = [];
+                    _outputJsonLatest.work = [];
                     await this.parseViaInternalApiWork();
                 }
                 if (profileParserResult.sections.education === 'incomplete') {
-                    _outputJson.education = [];
+                    _outputJsonStable.education = [];
+                    _outputJsonLatest.education = [];
                     await this.parseViaInternalApiEducation();
                 }
-                this.debugConsole.log(_outputJson);
+                this.debugConsole.log({
+                    _outputJsonStable,
+                    _outputJsonLatest
+                });
                 return true;
             }
         } catch (e) {
@@ -937,17 +1047,30 @@ window.LinkedinToResumeJson = (() => {
             const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
             if (contactInfo && typeof contactInfo.data === 'object') {
                 const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
-                _outputJson.basics.location.address = noNullOrUndef(contactInfo.data.address, _outputJson.basics.location.address);
-                _outputJson.basics.email = noNullOrUndef(emailAddress, _outputJson.basics.email);
+                /** @type {Partial<ResumeSchemaStable['basics']>} */
+                const partialBasics = {
+                    location: _outputJsonStable.basics.location
+                };
+                partialBasics.location.address = noNullOrUndef(contactInfo.data.address, _outputJsonStable.basics.location.address);
+                partialBasics.email = noNullOrUndef(emailAddress, _outputJsonStable.basics.email);
                 if (phoneNumbers && phoneNumbers.length) {
-                    _outputJson.basics.phone = noNullOrUndef(phoneNumbers[0].number);
+                    partialBasics.phone = noNullOrUndef(phoneNumbers[0].number);
                 }
+                _outputJsonStable.basics = {
+                    ..._outputJsonStable.basics,
+                    ...partialBasics
+                };
+                _outputJsonLatest.basics = {
+                    ..._outputJsonLatest.basics,
+                    ...partialBasics
+                };
 
                 // Scrape Websites
                 if (Array.isArray(websites)) {
                     for (let x = 0; x < websites.length; x++) {
                         if (/portfolio/i.test(websites[x].type.category)) {
-                            _outputJson.basics.url = websites[x].url;
+                            _outputJsonStable.basics.website = websites[x].url;
+                            _outputJsonLatest.basics.url = websites[x].url;
                         }
                     }
                 }
@@ -956,11 +1079,13 @@ window.LinkedinToResumeJson = (() => {
                 if (Array.isArray(twitterHandles)) {
                     twitterHandles.forEach((handleMeta) => {
                         const handle = handleMeta.name;
-                        _outputJson.basics.profiles.push({
+                        const formattedProfile = {
                             network: 'Twitter',
                             username: handle,
                             url: `https://twitter.com/${handle}`
-                        });
+                        };
+                        _outputJsonStable.basics.profiles.push(formattedProfile);
+                        _outputJsonLatest.basics.profiles.push(formattedProfile);
                     });
                 }
                 return true;
@@ -977,9 +1102,20 @@ window.LinkedinToResumeJson = (() => {
             if (basicAboutMe && typeof basicAboutMe.data === 'object') {
                 if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {
                     const data = basicAboutMe.included[0];
-                    _outputJson.basics.name = `${data.firstName} ${data.LastName}`;
-                    // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
-                    _outputJson.basics.label = data.occupation;
+                    /** @type {Partial<ResumeSchemaStable['basics']>} */
+                    const partialBasics = {
+                        name: `${data.firstName} ${data.LastName}`,
+                        // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
+                        label: data.occupation
+                    };
+                    _outputJsonStable.basics = {
+                        ..._outputJsonStable.basics,
+                        ...partialBasics
+                    };
+                    _outputJsonLatest.basics = {
+                        ..._outputJsonLatest.basics,
+                        ...partialBasics
+                    };
                 }
                 return true;
             }
@@ -994,9 +1130,20 @@ window.LinkedinToResumeJson = (() => {
             const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
             if (advancedAboutMe && typeof advancedAboutMe.data === 'object') {
                 const { data } = advancedAboutMe;
-                _outputJson.basics.name = `${data.firstName} ${data.lastName}`;
-                _outputJson.basics.label = data.headline;
-                _outputJson.basics.summary = data.summary;
+                /** @type {Partial<ResumeSchemaStable['basics']>} */
+                const partialBasics = {
+                    name: `${data.firstName} ${data.lastName}`,
+                    label: data.headline,
+                    summary: data.summary
+                };
+                _outputJsonStable.basics = {
+                    ..._outputJsonStable.basics,
+                    ...partialBasics
+                };
+                _outputJsonLatest.basics = {
+                    ..._outputJsonLatest.basics,
+                    ...partialBasics
+                };
                 return true;
             }
         } catch (e) {
@@ -1015,10 +1162,12 @@ window.LinkedinToResumeJson = (() => {
                 if (elem && 'recommendationText' in elem) {
                     // Need to do a secondary lookup to get the name of the person who gave the recommendation
                     const recommenderElem = db.entitiesByUrn[elem['*recommender']];
-                    _outputJson.references.push({
+                    const formattedReference = {
                         name: `${recommenderElem.firstName} ${recommenderElem.lastName}`,
                         reference: elem.recommendationText
-                    });
+                    };
+                    _outputJsonStable.references.push(formattedReference);
+                    _outputJsonLatest.references.push(formattedReference);
                 }
             });
         } catch (e) {
@@ -1106,7 +1255,10 @@ window.LinkedinToResumeJson = (() => {
                 }
             }
 
-            this.debugConsole.log(_outputJson);
+            this.debugConsole.log({
+                _outputJsonStable,
+                _outputJsonLatest
+            });
             if (apiSuccessCount > 0) {
                 this.parseSuccess = true;
             } else {
@@ -1237,7 +1389,8 @@ window.LinkedinToResumeJson = (() => {
                 }
             } else {
                 // Reset output to empty template
-                _outputJson = JSON.parse(JSON.stringify(_templateJson));
+                _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
+                _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
                 // Trigger full load
                 await _this.triggerAjaxLoadByScrolling();
                 _this.parseBasics();
@@ -1261,19 +1414,23 @@ window.LinkedinToResumeJson = (() => {
         });
     };
 
-    LinkedinToResumeJson.prototype.parseAndDownload = async function parseAndDownload() {
+    /** @param {SchemaVersion} version */
+    LinkedinToResumeJson.prototype.parseAndDownload = async function parseAndDownload(version = 'stable') {
         await this.tryParse();
-        const fileName = `${_outputJson.basics.name.replace(/\s/g, '_')}.resume.json`;
-        const fileContents = JSON.stringify(_outputJson, null, 2);
+        const fileName = `${_outputJsonStable.basics.name.replace(/\s/g, '_')}.resume.json`;
+        const rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLatest;
+        const fileContents = JSON.stringify(rawJson, null, 2);
         this.debugConsole.log(fileContents);
         promptDownload(fileContents, fileName, 'application/json');
     };
 
-    LinkedinToResumeJson.prototype.parseAndShowOutput = async function parseAndShowOutput() {
+    /** @param {SchemaVersion} version */
+    LinkedinToResumeJson.prototype.parseAndShowOutput = async function parseAndShowOutput(version = 'stable') {
         await this.tryParse();
+        const rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLatest;
         const parsedExport = {
-            raw: _outputJson,
-            stringified: JSON.stringify(_outputJson, null, 2)
+            raw: rawJson,
+            stringified: JSON.stringify(rawJson, null, 2)
         };
         console.log(parsedExport);
         if (this.parseSuccess) {
@@ -1396,12 +1553,14 @@ window.LinkedinToResumeJson = (() => {
         return document.location.origin + document.location.pathname;
     };
 
-    LinkedinToResumeJson.prototype.getJSON = function getJSON() {
+    /** @param {SchemaVersion} version */
+    LinkedinToResumeJson.prototype.getJSON = function getJSON(version = 'stable') {
+        const template = version === 'stable' ? _templateJsonStable : _templateJsonLatest;
         if (this.parseSuccess) {
-            return _outputJson;
+            return version === 'stable' ? _outputJsonStable : _outputJsonLatest;
         }
 
-        return _templateJson;
+        return template;
     };
 
     /**

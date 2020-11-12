@@ -10,7 +10,7 @@ const srcFolder = `${__dirname}/../src/`;
 
 // Copy src to build and then append some JS that will auto-execute when ran
 fse.copyFileSync(`${srcFolder}main.js`, `${buildFolder}main.js`);
-fse.appendFileSync(`${buildFolder}main.js`, 'window.linkedinToResumeJsonConverter = new LinkedinToResumeJson(null,true);\nwindow.linkedinToResumeJsonConverter.parseAndShowOutput();');
+fse.appendFileSync(`${buildFolder}main.js`, 'window.linkedinToResumeJsonConverter = new LinkedinToResumeJson();\nwindow.linkedinToResumeJsonConverter.parseAndShowOutput();');
 
 // Run bookmarklet converter
 childProc.execSync('bookmarklet ./build/main.js ./build-bookmarklet/bookmarklet_export.js');

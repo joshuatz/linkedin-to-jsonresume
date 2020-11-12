@@ -15,6 +15,13 @@ There are (or *were*) a few different options for how to use this:
      - This was originally how this tool worked, but had to be retired as a valid method when LinkedIn added a stricter CSP that prevented it from working
      - Code to generate the bookmarklet is still in this repo if LI ever loosens the CSP
 
+### Schema Versions
+This tool supports multiple version of [the JSON Resume Schema specification](https://github.com/jsonresume/resume-schema) for export, which you can easily swap between in the dropdown selector! ✨
+
+> "Which schema version should I use?"
+
+If you are unsure, you should probably just stick with *"stable"*, which is the default. It should have the most widespread support across the largest number of platforms.
+
 ### Support for Multilingual Profiles
 LinkedIn [has a unique feature](https://www.linkedin.com/help/linkedin/answer/1717/create-or-delete-a-profile-in-another-language) that allows you to create different versions of your profile for different languages, rather than relying on limited translation of certain fields.
 

@@ -1,4 +1,16 @@
+/**
+ * =============================
+ * =        Constants          =
+ * =============================
+ */
+
 const extensionId = chrome.runtime.id;
+
+const STORAGE_KEYS = {
+    schemaVersion: 'schemaVersion'
+};
+const SPEC_SELECT = /** @type {HTMLSelectElement} */ (document.getElementById('specSelect'));
+
 /**
  * Generate injectable code for capturing a value from the contentScript scope and passing back via message
  * @param {string} valueToCapture - Name of the scoped variable to capture
@@ -14,9 +26,8 @@ const createMainInstanceCode = `
 isDebug = window.location.href.includes('li2jr_debug=true');
 window.LinkedinToResumeJson = isDebug ? LinkedinToResumeJson : window.LinkedinToResumeJson;
 // Reuse existing instance if possible
-liToJrInstance = typeof(liToJrInstance) !== 'undefined' ? liToJrInstance : new LinkedinToResumeJson(false, isDebug);
+liToJrInstance = typeof(liToJrInstance) !== 'undefined' ? liToJrInstance : new LinkedinToResumeJson(isDebug);
 `;
-const runAndShowCode = `liToJrInstance.parseAndShowOutput();`;
 const getLangStringsCode = `(async () => {
     const supported = await liToJrInstance.getSupportedLocales();
     const user = liToJrInstance.getViewersLocalLang();
@@ -28,7 +39,14 @@ const getLangStringsCode = `(async () => {
 })();
 `;
 
-document.getElementById('versionDisplay').innerText = chrome.runtime.getManifest().version;
+/**
+ * Get JS string that can be eval'ed to get the program to run and show output
+ * Note: Be careful of strings versus vars, escaping, etc.
+ * @param {SchemaVersion} version
+ */
+const getRunAndShowCode = (version) => {
+    return `liToJrInstance.parseAndShowOutput('${version}');`;
+};
 
 /**
  * Toggle enabled state of popup
@@ -82,16 +100,30 @@ const setLang = (lang) => {
     );
 };
 
-chrome.tabs.executeScript(
-    {
-        file: 'main.js'
-    },
-    () => {
-        chrome.tabs.executeScript({
-            code: `${createMainInstanceCode}${getLangStringsCode}`
-        });
-    }
-);
+/** @param {SchemaVersion} version */
+const setSpecVersion = (version) => {
+    chrome.storage.sync.set({
+        [STORAGE_KEYS.schemaVersion]: version
+    });
+};
+
+/**
+ * Get user's preference for JSONResume Spec Version
+ * @returns {Promise<SchemaVersion>}
+ */
+const getSpecVersion = () => {
+    return new Promise((res) => {
+        try {
+            chrome.storage.sync.get([STORAGE_KEYS.schemaVersion], (result) => {
+                res(result[STORAGE_KEYS.schemaVersion]);
+            });
+        } catch (err) {
+            // Default to stable
+            res('stable');
+            console.error(err);
+        }
+    });
+};
 
 /**
  * =============================
@@ -113,7 +145,9 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     }
 });
 
-document.getElementById('liToJsonButton').addEventListener('click', () => {
+document.getElementById('liToJsonButton').addEventListener('click', async () => {
+    const versionOption = await getSpecVersion();
+    const runAndShowCode = getRunAndShowCode(versionOption);
     chrome.tabs.executeScript(
         {
             code: `${runAndShowCode}`
@@ -140,4 +174,30 @@ document.getElementById('langSelect').addEventListener('change', (evt) => {
 
 document.getElementById('vcardExportButton').addEventListener('click', () => {
     exportVCard();
+});
+
+SPEC_SELECT.addEventListener('change', () => {
+    setSpecVersion(/** @type {SchemaVersion} */ (SPEC_SELECT.value));
+});
+
+/**
+ * =============================
+ * =           Init            =
+ * =============================
+ */
+document.getElementById('versionDisplay').innerText = chrome.runtime.getManifest().version;
+
+chrome.tabs.executeScript(
+    {
+        file: 'main.js'
+    },
+    () => {
+        chrome.tabs.executeScript({
+            code: `${createMainInstanceCode}${getLangStringsCode}`
+        });
+    }
+);
+
+getSpecVersion().then((spec) => {
+    SPEC_SELECT.value = spec;
 });

@@ -12,5 +12,8 @@
         "alwaysStrict": true,
         "declaration": false,
         "noImplicitAny": true,
+        "maxNodeModuleJsDepth": 1,
+        "target": "es2015",
+        "moduleResolution": "node"
     }
 }

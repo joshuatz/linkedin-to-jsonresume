@@ -5,14 +5,9 @@ const requiredDirs = [`${__dirname}/../build`, `${__dirname}/../build-bookmarkle
 // Directories to always empty first
 const cleanDirs = [`${__dirname}/../build`, `${__dirname}/../build-bookmarklet`, `${__dirname}/../build-browserext`];
 
-for (let x = 0; x < requiredDirs.length; x++) {
-    if (!fse.existsSync(requiredDirs[x])) {
-        fse.mkdirSync(requiredDirs[x]);
-    }
-}
+const prep = async () => {
+    await Promise.all(requiredDirs.map((r) => fse.ensureDir(r)));
+    await Promise.all(cleanDirs.map((c) => fse.emptyDir(c)));
+};
 
-for (let x = 0; x < cleanDirs.length; x++) {
-    if (fse.existsSync(cleanDirs[x])) {
-        fse.emptyDirSync(cleanDirs[x]);
-    }
-}
+prep();

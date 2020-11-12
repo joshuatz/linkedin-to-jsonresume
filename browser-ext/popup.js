@@ -10,6 +10,8 @@ const STORAGE_KEYS = {
     schemaVersion: 'schemaVersion'
 };
 const SPEC_SELECT = /** @type {HTMLSelectElement} */ (document.getElementById('specSelect'));
+/** @type {SchemaVersion[]} */
+const SPEC_OPTIONS = ['beta', 'stable', 'latest'];
 
 /**
  * Generate injectable code for capturing a value from the contentScript scope and passing back via message
@@ -112,15 +114,21 @@ const setSpecVersion = (version) => {
  * @returns {Promise<SchemaVersion>}
  */
 const getSpecVersion = () => {
+    // Fallback value will be what is already selected in dropdown
+    const fallbackVersion = /** @type {SchemaVersion} */ (SPEC_SELECT.value);
     return new Promise((res) => {
         try {
             chrome.storage.sync.get([STORAGE_KEYS.schemaVersion], (result) => {
-                res(result[STORAGE_KEYS.schemaVersion]);
+                const storedSetting = result[STORAGE_KEYS.schemaVersion] || '';
+                if (SPEC_OPTIONS.includes(storedSetting)) {
+                    res(storedSetting);
+                } else {
+                    res(fallbackVersion);
+                }
             });
         } catch (err) {
-            // Default to stable
-            res('stable');
             console.error(err);
+            res(fallbackVersion);
         }
     });
 };

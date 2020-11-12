@@ -6,84 +6,12 @@
  */
 
 const VCardsJS = require('@dan/vcards');
-
-/**
- * @typedef {import('../jsonresume.schema.stable').ResumeSchemaStable} ResumeSchemaStable
- * @typedef {import('../jsonresume.schema.latest').ResumeSchemaLatest} ResumeSchemaLatest
- * @typedef {import('../jsonresume.schema.latest').ResumeSchemaBeyondSpec} ResumeSchemaBeyondSpec
- * @typedef {'stable' | 'latest' | 'beta'} SchemaVersion
- */
+const { resumeJsonTemplateLatest, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } = require('./templates');
 
 // ==Bookmarklet==
 // @name linkedin-to-jsonresume-bookmarklet
 // @author Joshua Tzucker
 // ==/Bookmarklet==
-
-/** @type {Required<ResumeSchemaStable>} */
-const resumeJsonTemplateStable = {
-    basics: {
-        name: '',
-        label: '',
-        picture: '',
-        email: '',
-        phone: '',
-        website: '',
-        summary: '',
-        location: {
-            address: '',
-            postalCode: '',
-            city: '',
-            countryCode: '',
-            region: ''
-        },
-        profiles: []
-    },
-    work: [],
-    volunteer: [],
-    education: [],
-    awards: [],
-    publications: [],
-    skills: [],
-    languages: [],
-    interests: [],
-    references: []
-};
-
-/** @type {Required<ResumeSchemaLatest>} */
-const resumeJsonTemplateLatest = {
-    $schema: 'https://json.schemastore.org/resume',
-    basics: {
-        name: '',
-        label: '',
-        image: '',
-        email: '',
-        phone: '',
-        url: '',
-        summary: '',
-        location: {
-            address: '',
-            postalCode: '',
-            city: '',
-            countryCode: '',
-            region: ''
-        },
-        profiles: []
-    },
-    work: [],
-    volunteer: [],
-    education: [],
-    awards: [],
-    publications: [],
-    skills: [],
-    languages: [],
-    interests: [],
-    references: [],
-    projects: [],
-    meta: {
-        version: 'v0.1.3',
-        canonical: 'https://github.com/jsonresume/resume-schema/blob/v0.1.3/schema.json'
-    }
-};
 
 // @ts-ignore
 window.LinkedinToResumeJson = (() => {
@@ -188,12 +116,12 @@ window.LinkedinToResumeJson = (() => {
         document.body.removeChild(a);
     };
 
-    /** @type {resumeJsonTemplateStable} */
+    /** @type {ResumeSchemaStable} */
     let _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
     /** @type {ResumeSchemaLatest} */
     let _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
-    const _templateJsonStable = resumeJsonTemplateStable;
-    const _templateJsonLatest = resumeJsonTemplateLatest;
+    /** @type {ResumeSchemaBeyondSpec} */
+    let _outputJsonBetaPartial = JSON.parse(JSON.stringify(resumeJsonTemplateBetaPartial));
     const _liSchemaKeys = {
         profile: '*profile',
         certificates: '*certificationView',
@@ -753,31 +681,26 @@ window.LinkedinToResumeJson = (() => {
 
             /**
              * Parse certificates
-             *  - NOTE: This is not currently supported by the official JSON Resume spec,
-             * so this is hidden behind the exportBeyondSpec setting / flag.
-             *  - Once JSON Resume adds a certificate section to the offical specs,
-             * this should be moved out and made automatic
+             *  - NOTE: This is not currently supported by the official (stable / latest) JSON Resume spec,
+             *  - Restricted to 'beta' template
              * @see https://github.com/jsonresume/resume-schema/pull/340
              */
-            if (_this.exportBeyondSpec) {
-                /** @type {ResumeSchemaBeyondSpec['certificates']} */
-                const certificates = [];
-                db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
-                    /** @type {ResumeSchemaBeyondSpec['certificates'][0]} */
-                    const certObj = {
-                        title: cert.name,
-                        issuer: cert.authority
-                    };
-                    parseAndAttachResumeDates(certObj, cert);
-                    if (typeof cert.url === 'string' && cert.url) {
-                        certObj.url = cert.url;
-                    }
-                    certificates.push(certObj);
-                });
-                resultSummary.sections.certificates = certificates.length ? 'success' : 'empty';
-                // @ts-ignore
-                _outputJsonLatest.certificates = certificates;
-            }
+            /** @type {ResumeSchemaBeyondSpec['certificates']} */
+            const certificates = [];
+            db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
+                /** @type {ResumeSchemaBeyondSpec['certificates'][0]} */
+                const certObj = {
+                    title: cert.name,
+                    issuer: cert.authority
+                };
+                parseAndAttachResumeDates(certObj, cert);
+                if (typeof cert.url === 'string' && cert.url) {
+                    certObj.url = cert.url;
+                }
+                certificates.push(certObj);
+            });
+            resultSummary.sections.certificates = certificates.length ? 'success' : 'empty';
+            _outputJsonBetaPartial.certificates = certificates;
 
             // Parse skills
             /** @type {string[]} */
@@ -798,21 +721,18 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.sections.skills = skillArr.length ? 'success' : 'empty';
 
             // Parse projects
-            // Not currently used by Resume JSON
-            if (_this.exportBeyondSpec) {
-                _outputJsonLatest.projects = _outputJsonLatest.projects || [];
-                db.getValuesByKey(_liSchemaKeys.projects).forEach((project) => {
-                    const parsedProject = {
-                        name: project.title,
-                        startDate: '',
-                        summary: project.description,
-                        url: project.url
-                    };
-                    parseAndAttachResumeDates(parsedProject, project);
-                    _outputJsonLatest.projects.push(parsedProject);
-                });
-                resultSummary.sections.projects = _outputJsonLatest.projects.length ? 'success' : 'empty';
-            }
+            _outputJsonLatest.projects = _outputJsonLatest.projects || [];
+            db.getValuesByKey(_liSchemaKeys.projects).forEach((project) => {
+                const parsedProject = {
+                    name: project.title,
+                    startDate: '',
+                    summary: project.description,
+                    url: project.url
+                };
+                parseAndAttachResumeDates(parsedProject, project);
+                _outputJsonLatest.projects.push(parsedProject);
+            });
+            resultSummary.sections.projects = _outputJsonLatest.projects.length ? 'success' : 'empty';
 
             // Parse awards
             const awardEntries = db.getValuesByKey(_liSchemaKeys.awards);
@@ -883,12 +803,11 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Constructor
-     * @param {boolean} [OPT_exportBeyondSpec] - Should the tool export additioanl details, beyond the official JSONResume specifications?
      * @param {boolean} [OPT_debug] - Debug Mode?
      * @param {boolean} [OPT_preferApi] - Prefer Voyager API, rather than DOM scrape?
      * @param {boolean} [OPT_getFullSkills] - Retrieve full skills (behind additional API endpoint), rather than just basics
      */
-    function LinkedinToResumeJson(OPT_exportBeyondSpec, OPT_debug, OPT_preferApi, OPT_getFullSkills) {
+    function LinkedinToResumeJson(OPT_debug, OPT_preferApi, OPT_getFullSkills) {
         const _this = this;
         this.profileId = this.getProfileId();
         /** @type {string | null} */
@@ -902,7 +821,6 @@ window.LinkedinToResumeJson = (() => {
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
-        this.exportBeyondSpec = typeof OPT_exportBeyondSpec === 'boolean' ? OPT_exportBeyondSpec : false;
         this.preferApi = typeof OPT_preferApi === 'boolean' ? OPT_preferApi : true;
         this.debug = typeof OPT_debug === 'boolean' ? OPT_debug : false;
         if (this.debug) {
@@ -1257,7 +1175,8 @@ window.LinkedinToResumeJson = (() => {
 
             this.debugConsole.log({
                 _outputJsonStable,
-                _outputJsonLatest
+                _outputJsonLatest,
+                _outputJsonBetaPartial
             });
             if (apiSuccessCount > 0) {
                 this.parseSuccess = true;
@@ -1365,6 +1284,7 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Try to scrape / get API and parse
+     *  - Has some basic cache checking to avoid redundant parsing
      * @param {string} [optLocale]
      */
     LinkedinToResumeJson.prototype.tryParse = async function tryParse(optLocale) {
@@ -1391,6 +1311,7 @@ window.LinkedinToResumeJson = (() => {
                 // Reset output to empty template
                 _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
                 _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
+                _outputJsonBetaPartial = JSON.parse(JSON.stringify(resumeJsonTemplateBetaPartial));
                 // Trigger full load
                 await _this.triggerAjaxLoadByScrolling();
                 _this.parseBasics();
@@ -1415,10 +1336,23 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /** @param {SchemaVersion} version */
-    LinkedinToResumeJson.prototype.parseAndDownload = async function parseAndDownload(version = 'stable') {
+    LinkedinToResumeJson.prototype.parseAndGetRawJson = async function parseAndGetRawJson(version = 'stable') {
         await this.tryParse();
+        let rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLatest;
+        // If beta, combine with latest
+        if (version === 'beta') {
+            rawJson = {
+                ...rawJson,
+                ..._outputJsonBetaPartial
+            };
+        }
+        return rawJson;
+    };
+
+    /** @param {SchemaVersion} version */
+    LinkedinToResumeJson.prototype.parseAndDownload = async function parseAndDownload(version = 'stable') {
+        const rawJson = await this.parseAndGetRawJson(version);
         const fileName = `${_outputJsonStable.basics.name.replace(/\s/g, '_')}.resume.json`;
-        const rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLatest;
         const fileContents = JSON.stringify(rawJson, null, 2);
         this.debugConsole.log(fileContents);
         promptDownload(fileContents, fileName, 'application/json');
@@ -1426,8 +1360,7 @@ window.LinkedinToResumeJson = (() => {
 
     /** @param {SchemaVersion} version */
     LinkedinToResumeJson.prototype.parseAndShowOutput = async function parseAndShowOutput(version = 'stable') {
-        await this.tryParse();
-        const rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLatest;
+        const rawJson = await this.parseAndGetRawJson(version);
         const parsedExport = {
             raw: rawJson,
             stringified: JSON.stringify(rawJson, null, 2)
@@ -1551,16 +1484,6 @@ window.LinkedinToResumeJson = (() => {
 
     LinkedinToResumeJson.prototype.getUrlWithoutQuery = function getUrlWithoutQuery() {
         return document.location.origin + document.location.pathname;
-    };
-
-    /** @param {SchemaVersion} version */
-    LinkedinToResumeJson.prototype.getJSON = function getJSON(version = 'stable') {
-        const template = version === 'stable' ? _templateJsonStable : _templateJsonLatest;
-        if (this.parseSuccess) {
-            return version === 'stable' ? _outputJsonStable : _outputJsonLatest;
-        }
-
-        return template;
     };
 
     /**

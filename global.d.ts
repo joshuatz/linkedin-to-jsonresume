@@ -118,7 +118,8 @@ declare global {
 
     interface ParseProfileSchemaResultSummary {
         liResponse: LiResponse;
-        profileObj: LiResponse;
+        profileInfoObj?: LiEntity;
+        profileSrc: 'profileView' | 'dashFullProfileWithEntities';
         pageUrl: string;
         localeStr?: string;
         parseSuccess: boolean;

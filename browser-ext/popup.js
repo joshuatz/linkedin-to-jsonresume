@@ -12,6 +12,8 @@ const STORAGE_KEYS = {
 const SPEC_SELECT = /** @type {HTMLSelectElement} */ (document.getElementById('specSelect'));
 /** @type {SchemaVersion[]} */
 const SPEC_OPTIONS = ['beta', 'stable', 'latest'];
+/** @type {HTMLSelectElement} */
+const LANG_SELECT = document.querySelector('.langSelect');
 
 /**
  * Generate injectable code for capturing a value from the contentScript scope and passing back via message
@@ -42,12 +44,19 @@ const getLangStringsCode = `(async () => {
 `;
 
 /**
+ * Get the currently selected lang locale in the selector
+ */
+const getSelectedLang = () => {
+    return LANG_SELECT.value;
+};
+
+/**
  * Get JS string that can be eval'ed to get the program to run and show output
  * Note: Be careful of strings versus vars, escaping, etc.
  * @param {SchemaVersion} version
  */
 const getRunAndShowCode = (version) => {
-    return `liToJrInstance.parseAndShowOutput('${version}');`;
+    return `liToJrInstance.preferLocale = '${getSelectedLang()}';liToJrInstance.parseAndShowOutput('${version}');`;
 };
 
 /**
@@ -66,14 +75,12 @@ const toggleEnabled = (isEnabled) => {
  * @param {string[]} langs
  */
 const loadLangs = (langs) => {
-    /** @type {HTMLSelectElement} */
-    const selectElem = document.querySelector('.langSelect');
-    selectElem.innerHTML = '';
+    LANG_SELECT.innerHTML = '';
     langs.forEach((lang) => {
         const option = document.createElement('option');
         option.value = lang;
         option.innerText = lang;
-        selectElem.appendChild(option);
+        LANG_SELECT.appendChild(option);
     });
     toggleEnabled(langs.length > 0);
 };
@@ -171,13 +178,12 @@ document.getElementById('liToJsonButton').addEventListener('click', async () => 
 
 document.getElementById('liToJsonDownloadButton').addEventListener('click', () => {
     chrome.tabs.executeScript({
-        code: `liToJrInstance.parseAndDownload();`
+        code: `liToJrInstance.preferLocale = '${getSelectedLang()}';liToJrInstance.parseAndDownload();`
     });
 });
 
-document.getElementById('langSelect').addEventListener('change', (evt) => {
-    const updatedLang = /** @type {HTMLSelectElement} */ (evt.target).value;
-    setLang(updatedLang);
+LANG_SELECT.addEventListener('change', () => {
+    setLang(getSelectedLang());
 });
 
 document.getElementById('vcardExportButton').addEventListener('click', () => {

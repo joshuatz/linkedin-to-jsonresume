@@ -5,7 +5,9 @@ Back to main README: [click here](./README.md)
  - V2 Docs:
      - https://docs.microsoft.com/en-us/linkedin/
      - https://developer.linkedin.com/docs/guide/v2
- - Another project that uses the unofficial Voyager API: [tomquirk/linkedin-api](https://github.com/tomquirk/linkedin-api)
+ - Other projects that use the unofficial Voyager API:
+     - [tomquirk/linkedin-api](https://github.com/tomquirk/linkedin-api)
+     - [eilonmore/linkedin-private-api](https://github.com/eilonmore/linkedin-private-api)
  - LinkedIn DataHub (this powers a lot of the backend)
      - [Blog Post](https://engineering.linkedin.com/blog/2019/data-hub)
      - [Github Repo](https://github.com/linkedin/datahub)
@@ -75,6 +77,33 @@ Here are some quick notes on Voyager responses and how data is grouped / nested:
      - This can also make paging a little messy.
  - LI has limits on certain endpoints, and the amount of nested elements it will return
      - See [PR #23](https://github.com/joshuatz/linkedin-to-jsonresume/pull/23) for an example of how this was implemented
+
+### Voyager - Misc Notes
+ - Make sure you always include the `Host` header if making requests outside a web browser (browsers will automatically include this for you)
+     - Value should be: `www.linkedin.com`
+     - If you forget it, you will get 400 error (`invalid hostname`)
+ - For inline data, `<code></code>` with request payload usually ***follows*** `<img><code></code>` with *response* payload
+ - It appears as though whatever language the profile was ***first*** created with sticks as the "principal language", regardless if user changes language settings (more on this below).
+     - You can find this under the main profile object, where you would find `supportedLocales` - the default / initial locale is under - `defaultLocale`
+
+### Voyager - Multilingual and Locales Support
+> LI seems to be making changes related to this; this section might not be 100% up-to-date.
+
+There are some really strange quirks around multi-locale profiles. When a multi-locale user is logged in and requesting *their own* profile, LI will *refuse* to let the `x-li-lang` header override the `defaultLocale` as specified by the profile (see [issue #35](https://github.com/joshuatz/linkedin-to-jsonresume/issues/35)). However, if *someone else* exports their profile, the same exact endpoints will respect the header and will return the correct data for the requested locale (assuming creator made a version of their profile with the requested locale).
+
+Even stranger, this quirk only seems to apply to *certain* endpoints; e.g. `/me` respects the requested language, but `/profileView` does not (and *always* returns data corresponding with `defaultLocale`) 🙃
+
+Furthermore, the `/dash` subset of endpoints does not ever (AFAIK) change the main key-value pairs based on `x-li-lang`; instead, it nests multi-locale data under `multiLocale` prefixed keys. For example:
+
+```json
+{
+    "firstName": "Алексе́й",
+    "multiLocaleFirstName": {
+        "ru_RU": "Алексе́й",
+        "en_US": "Alexey"
+    }
+}
+```
 
 ## LinkedIn TS Types
 I've put some basics LI types in my `global.d.ts`. Eventually, it would be nice to re-write the core of this project as TS, as opposed to the current VSCode-powered typed JS approached.

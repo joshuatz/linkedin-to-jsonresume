@@ -8,6 +8,8 @@
     "browser": true
   },
   "rules": {
+    "no-self-assign": "off",
+    "no-param-reassign": "off",
     "no-underscore-dangle": "off",
     "no-plusplus": "off",
     "no-useless-escape": "off",

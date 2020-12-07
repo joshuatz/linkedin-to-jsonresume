@@ -122,6 +122,13 @@ window.LinkedinToResumeJson = (() => {
     let _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
     /** @type {ResumeSchemaBeyondSpec} */
     let _outputJsonBetaPartial = JSON.parse(JSON.stringify(resumeJsonTemplateBetaPartial));
+    /** @type {string[]} */
+    let _supportedLocales = [];
+    /** @type {string} */
+    let _defaultLocale = `en_US`;
+    /**
+     * Lookup keys for the standard profileView object
+     */
     const _liSchemaKeys = {
         profile: '*profile',
         certificates: '*certificationView',
@@ -134,6 +141,76 @@ window.LinkedinToResumeJson = (() => {
         volunteerWork: '*volunteerExperienceView',
         awards: '*honorView',
         publications: '*publicationView'
+    };
+    /**
+     * Try to maintain a mapping between generic section types, and LI's schema
+     *  - tocKeys are pointers that often point to a collection of URNs
+     *  - Try to put dash strings last, profileView first
+     *  - Most recipes are dash only
+     */
+    const _liTypeMappings = {
+        profile: {
+            // There is no tocKey for profile in dash FullProfileWithEntries,
+            // due to how entry-point is configured
+            tocKeys: ['*profile'],
+            types: [
+                // regular profileView
+                'com.linkedin.voyager.identity.profile.Profile',
+                // dash FullProfile
+                'com.linkedin.voyager.dash.identity.profile.Profile'
+            ],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities']
+        },
+        certificates: {
+            tocKeys: ['*certificationView', '*profileCertifications'],
+            types: ['com.linkedin.voyager.dash.identity.profile.Certification'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileCertification']
+        },
+        education: {
+            tocKeys: ['*educationView', '*profileEducations'],
+            types: [
+                'com.linkedin.voyager.identity.profile.Education',
+                // Dash
+                'com.linkedin.voyager.dash.identity.profile.Education'
+            ],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileEducation']
+        },
+        // Individual work entries (not aggregate (workgroup) with date range)
+        workPositions: {
+            tocKeys: ['*positionView', '*profilePositionGroups'],
+            types: ['com.linkedin.voyager.identity.profile.Position', 'com.linkedin.voyager.dash.identity.profile.Position'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePosition']
+        },
+        skills: {
+            tocKeys: ['*skillView', '*profileSkills'],
+            types: ['com.linkedin.voyager.identity.profile.Skill', 'com.linkedin.voyager.dash.identity.profile.Skill'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileSkill']
+        },
+        projects: {
+            tocKeys: ['*projectView', '*profileProjects'],
+            types: ['com.linkedin.voyager.identity.profile.Project', 'com.linkedin.voyager.dash.identity.profile.Project'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileProject']
+        },
+        attachments: {
+            tocKeys: ['*summaryTreasuryMedias', '*profileTreasuryMediaPosition'],
+            types: ['com.linkedin.voyager.identity.profile.Certification', 'com.linkedin.voyager.dash.identity.profile.treasury.TreasuryMedia'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileTreasuryMedia']
+        },
+        volunteerWork: {
+            tocKeys: ['*volunteerExperienceView', '*profileVolunteerExperiences'],
+            types: ['com.linkedin.voyager.dash.identity.profile.VolunteerExperience'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileVolunteerExperience']
+        },
+        awards: {
+            tocKeys: ['*honorView', '*profileHonors'],
+            types: ['com.linkedin.voyager.identity.profile.Honor', 'com.linkedin.voyager.dash.identity.profile.Honor'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileHonor']
+        },
+        publications: {
+            tocKeys: ['*publicationView', '*profilePublications'],
+            types: ['com.linkedin.voyager.identity.profile.Publication', 'com.linkedin.voyager.dash.identity.profile.Publication'],
+            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePublication']
+        }
     };
     const _voyagerBase = 'https://www.linkedin.com/voyager/api';
     const _voyagerEndpoints = {
@@ -290,11 +367,12 @@ window.LinkedinToResumeJson = (() => {
         };
         /**
          * Get all elements that match type. Should usually just be one
-         * @param {string} typeStr - Type, e.g. `$com.linkedin...`
+         * @param {string | string[]} typeStr - Type, e.g. `$com.linkedin...`
          * @returns {LiEntity[]}
          */
         db.getElementsByType = function getElementByType(typeStr) {
-            return db.entities.filter((entity) => entity['$type'] === typeStr);
+            const typeStrArr = Array.isArray(typeStr) ? typeStr : [typeStr];
+            return db.entities.filter((entity) => typeStrArr.indexOf(entity['$type']) !== -1);
         };
         /**
          * Get an element by URN
@@ -307,12 +385,31 @@ window.LinkedinToResumeJson = (() => {
         db.getElementsByUrns = function getElementsByUrns(urns) {
             return urns.map((urn) => db.entitiesByUrn[urn]);
         };
+        // Only meant for 1:1 lookups; will return first match, if more than one
+        // key provided. Usually returns a "view" (kind of a collection)
         db.getValueByKey = function getValueByKey(key) {
-            return db.entitiesByUrn[db.tableOfContents[key]];
+            const keyArr = Array.isArray(key) ? key : [key];
+            for (let x = 0; x < keyArr.length; x++) {
+                const foundVal = db.entitiesByUrn[db.tableOfContents[keyArr[x]]];
+                if (foundVal) {
+                    return foundVal;
+                }
+            }
+            return undefined;
         };
         // This, opposed to getValuesByKey, allow for multi-depth traversal
+        /**
+         * @type {InternalDb['getValuesByKey']}
+         */
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
             const values = [];
+            if (Array.isArray(key)) {
+                return [].concat(
+                    ...key.map((k) => {
+                        return this.getValuesByKey(k, optTocValModifier);
+                    })
+                );
+            }
             let tocVal = this.tableOfContents[key];
             if (typeof optTocValModifier === 'function') {
                 tocVal = optTocValModifier(tocVal);
@@ -347,6 +444,57 @@ window.LinkedinToResumeJson = (() => {
         };
         // @ts-ignore
         return db;
+    }
+
+    /**
+     * "Remaps" data that is nested under a multilingual wrapper, hoisting it
+     * back up to top-level keys (overwriting existing values).
+     *
+     * WARNING: Modifies object IN PLACE
+     * @example
+     * ```js
+     * const input = {
+     *     firstName: 'Алексе́й',
+     *     multiLocaleFirstName: {
+     *         ru_RU: 'Алексе́й',
+     *         en_US: 'Alexey'
+     *     }
+     * }
+     * console.log(remapNestedLocale(input, 'en_US').firstName);
+     * // 'Alexey'
+     * ```
+     * @param {LiEntity | LiEntity[]} liObject The LI response object(s) to remap
+     * @param {string} desiredLocale Desired Locale string (LI format / ISO-3166-1). Defaults to instance property
+     * @param {boolean} [deep] Run remapper recursively, replacing at all applicable levels
+     */
+    function remapNestedLocale(liObject, desiredLocale, deep = true) {
+        if (Array.isArray(liObject)) {
+            liObject.forEach((o) => {
+                remapNestedLocale(o, desiredLocale, deep);
+            });
+        } else {
+            Object.keys(liObject).forEach((prop) => {
+                const nestedVal = liObject[prop];
+                if (!!nestedVal && typeof nestedVal === 'object') {
+                    // Test for locale wrapped property
+                    // example: `multiLocaleFirstName`
+                    if (prop.startsWith('multiLocale')) {
+                        /** @type {Record<string, any>} */
+                        const localeMap = nestedVal;
+                        // eslint-disable-next-line no-prototype-builtins
+                        if (localeMap.hasOwnProperty(desiredLocale)) {
+                            // Transform multiLocaleFirstName to firstName
+                            const nonPrefixedKeyPascalCase = prop.replace(/multiLocale/i, '');
+                            const nonPrefixedKeyLowerCamelCase = nonPrefixedKeyPascalCase.charAt(0).toLocaleLowerCase() + nonPrefixedKeyPascalCase.substring(1);
+                            // Remap nested value to top level
+                            liObject[nonPrefixedKeyLowerCamelCase] = localeMap[desiredLocale];
+                        }
+                    } else if (deep) {
+                        remapNestedLocale(liObject[prop], desiredLocale, deep);
+                    }
+                }
+            });
+        }
     }
 
     /**
@@ -420,11 +568,9 @@ window.LinkedinToResumeJson = (() => {
             const start = timePeriod.startDate || timePeriod.start;
             const end = timePeriod.endDate || timePeriod.end;
             if (end) {
-                // eslint-disable-next-line no-param-reassign
                 resumeObj.endDate = parseDate(end);
             }
             if (start) {
-                // eslint-disable-next-line no-param-reassign
                 resumeObj.startDate = parseDate(start);
             }
         }
@@ -482,6 +628,7 @@ window.LinkedinToResumeJson = (() => {
             summary: positionObj.description,
             website: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
         };
+        // debugger;
         parseAndAttachResumeDates(parsedWork, positionObj);
         // Lookup company website
         if (positionObj.company && positionObj.company['*miniCompany']) {
@@ -506,15 +653,19 @@ window.LinkedinToResumeJson = (() => {
     /**
      * Main parser for giant profile JSON block
      * @param {LinkedinToResumeJson} instance
-     * @param {LiResponse} profileObj
+     * @param {LiResponse} liResponse
+     * @param {'profileView' | 'dashFullProfileWithEntities'} [endpoint]
+     * @returns {Promise<ParseProfileSchemaResultSummary>}
      */
-    async function parseProfileSchemaJSON(instance, profileObj) {
+    async function parseProfileSchemaJSON(instance, liResponse, endpoint = 'profileView') {
         const _this = instance;
+        const dash = endpoint === 'dashFullProfileWithEntities';
         let foundGithub = false;
         const foundPortfolio = false;
         /** @type {ParseProfileSchemaResultSummary} */
         const resultSummary = {
-            profileObj,
+            liResponse,
+            profileObj: liResponse,
             pageUrl: null,
             parseSuccess: false,
             sections: {
@@ -535,21 +686,55 @@ window.LinkedinToResumeJson = (() => {
         }
         try {
             // Build db object
-            const db = buildDbFromLiSchema(profileObj);
+            let db = buildDbFromLiSchema(liResponse);
+
+            if (dash && !liResponse.data.hoisted) {
+                // For FullProfileWithEntities, the main entry point of response
+                // (response.data) points directly to the profile object, by URN
+                // This profile obj itself holds the ToC to its content, instead
+                // of having the ToC in the res.data section (like profileView)
+                const profileObj = db.getElementByUrn(db.tableOfContents['*elements'][0]);
+                if (!profileObj || !profileObj.firstName) {
+                    throw new Error('Could not extract nested profile object from Dash endpoint');
+                }
+                // To make this easier to work with lookup, we'll unpack the
+                // profile view nested object BACK into the root (ToC), so
+                // that lookups can be performed by key instead of type | recipe
+                /** @type {LiResponse} */
+                const hoistedRes = {
+                    data: {
+                        ...liResponse.data,
+                        ...profileObj,
+                        // Set flag for future
+                        hoisted: true
+                    },
+                    included: liResponse.included
+                };
+                resultSummary.profileObj = hoistedRes;
+                db = buildDbFromLiSchema(hoistedRes);
+                console.log(db);
+            }
 
             // Parse basics / profile
             let profileGrabbed = false;
-            db.getValuesByKey(_liSchemaKeys.profile).forEach((profile) => {
+            const profileObjs = dash ? [db.getElementByUrn(db.tableOfContents['*elements'][0])] : db.getValuesByKey(_liSchemaKeys.profile);
+            console.log({ profileObjs });
+            profileObjs.forEach((profile) => {
                 // There should only be one
                 if (!profileGrabbed) {
                     profileGrabbed = true;
+                    /**
+                     * What the heck LI, this seems *intentionally* misleading
+                     * @type {LiSupportedLocale}
+                     */
+                    const localeObject = !dash ? profile.defaultLocale : profile.primaryLocale;
                     /** @type {ResumeSchemaStable['basics']} */
                     const formattedProfileObj = {
                         name: `${profile.firstName} ${profile.lastName}`,
                         summary: noNullOrUndef(profile.summary),
                         label: noNullOrUndef(profile.headline),
                         location: {
-                            countryCode: profile.defaultLocale.country
+                            countryCode: localeObject.country
                         }
                     };
                     if (profile.address) {
@@ -567,20 +752,25 @@ window.LinkedinToResumeJson = (() => {
                     };
                     /** @type {ResumeSchemaStable['languages'][0]} */
                     const formatttedLang = {
-                        language: profile.defaultLocale.language,
+                        language: localeObject.language,
                         fluency: 'Native Speaker'
                     };
                     _outputJsonStable.languages.push(formatttedLang);
                     _outputJsonLatest.languages.push(formatttedLang);
                     resultSummary.sections.basics = 'success';
+
+                    // Also make sure instance defaultLocale is correct, while we are parsing profile
+                    const parsedLocaleStr = `${localeObject.language}_${localeObject.country}`;
+                    _defaultLocale = parsedLocaleStr;
+                    resultSummary.localeStr = parsedLocaleStr;
                 }
             });
 
             // Parse attachments / portfolio links
-            const attachments = db.getValuesByKey(_liSchemaKeys.attachments);
+            const attachments = db.getValuesByKey(_liTypeMappings.attachments.tocKeys);
             attachments.forEach((attachment) => {
                 let captured = false;
-                const { url } = attachment.data;
+                const url = attachment.data.url || attachment.data.Url;
                 if (attachment.providerName === 'GitHub' || /github\.com/gim.test(url)) {
                     const usernameMatch = /github\.com\/([^\/\?]+)[^\/]+$/gim.exec(url);
                     if (usernameMatch && !foundGithub) {
@@ -606,10 +796,10 @@ window.LinkedinToResumeJson = (() => {
                     captured = true;
                     _outputJsonLatest.projects = _outputJsonLatest.projects || [];
                     _outputJsonLatest.projects.push({
-                        name: attachment.title,
+                        name: attachment.title || attachment.mediaTitle,
                         startDate: '',
                         endDate: '',
-                        description: attachment.description,
+                        description: attachment.description || attachment.mediaDescription,
                         url
                     });
                 }
@@ -619,13 +809,13 @@ window.LinkedinToResumeJson = (() => {
             // Parse education
             let allEducationCanBeCaptured = true;
             // educationView contains both paging data, and list of child elements
-            const educationView = db.getValueByKey(_liSchemaKeys.education);
+            const educationView = db.getValueByKey(_liTypeMappings.education.tocKeys);
             if (educationView.paging) {
                 const { paging } = educationView;
                 allEducationCanBeCaptured = paging.start + paging.count >= paging.total;
             }
             if (allEducationCanBeCaptured) {
-                const educationEntries = db.getValuesByKey(_liSchemaKeys.education);
+                const educationEntries = db.getValuesByKey(_liTypeMappings.education.tocKeys);
                 educationEntries.forEach((edu) => {
                     parseAndPushEducation(edu, db, _this);
                 });
@@ -639,13 +829,14 @@ window.LinkedinToResumeJson = (() => {
             // Parse work
             // First, check paging data
             let allWorkCanBeCaptured = true;
-            const positionView = db.getValueByKey(_liSchemaKeys.workPositions);
+            const positionView = db.getValueByKey(_liTypeMappings.workPositions.tocKeys);
             if (positionView.paging) {
                 const { paging } = positionView;
                 allWorkCanBeCaptured = paging.start + paging.count >= paging.total;
             }
             if (allWorkCanBeCaptured) {
-                db.getValuesByKey(_liSchemaKeys.workPositions).forEach((position) => {
+                const workPositions = db.getElementsByType(_liTypeMappings.workPositions.types);
+                workPositions.forEach((position) => {
                     parseAndPushPosition(position);
                 });
                 _this.debugConsole.log(`All work positions captured directly from profile result.`);
@@ -656,7 +847,7 @@ window.LinkedinToResumeJson = (() => {
             }
 
             // Parse volunteer experience
-            const volunteerEntries = db.getValuesByKey(_liSchemaKeys.volunteerWork);
+            const volunteerEntries = db.getValuesByKey(_liTypeMappings.volunteerWork.tocKeys);
             volunteerEntries.forEach((volunteering) => {
                 /** @type {ResumeSchemaStable['volunteer'][0]} */
                 const parsedVolunteerWork = {
@@ -687,7 +878,7 @@ window.LinkedinToResumeJson = (() => {
              */
             /** @type {ResumeSchemaBeyondSpec['certificates']} */
             const certificates = [];
-            db.getValuesByKey(_liSchemaKeys.certificates).forEach((cert) => {
+            db.getValuesByKey(_liTypeMappings.certificates.tocKeys).forEach((cert) => {
                 /** @type {ResumeSchemaBeyondSpec['certificates'][0]} */
                 const certObj = {
                     title: cert.name,
@@ -705,7 +896,7 @@ window.LinkedinToResumeJson = (() => {
             // Parse skills
             /** @type {string[]} */
             const skillArr = [];
-            db.getValuesByKey(_liSchemaKeys.skills).forEach((skill) => {
+            db.getValuesByKey(_liTypeMappings.skills.tocKeys).forEach((skill) => {
                 skillArr.push(skill.name);
             });
             document.querySelectorAll('span[class*="skill-category-entity"][class*="name"]').forEach((skillNameElem) => {
@@ -722,7 +913,7 @@ window.LinkedinToResumeJson = (() => {
 
             // Parse projects
             _outputJsonLatest.projects = _outputJsonLatest.projects || [];
-            db.getValuesByKey(_liSchemaKeys.projects).forEach((project) => {
+            db.getValuesByKey(_liTypeMappings.projects.tocKeys).forEach((project) => {
                 const parsedProject = {
                     name: project.title,
                     startDate: '',
@@ -735,7 +926,7 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.sections.projects = _outputJsonLatest.projects.length ? 'success' : 'empty';
 
             // Parse awards
-            const awardEntries = db.getValuesByKey(_liSchemaKeys.awards);
+            const awardEntries = db.getValuesByKey(_liTypeMappings.awards.tocKeys);
             awardEntries.forEach((award) => {
                 /** @type {ResumeSchemaStable['awards'][0]} */
                 const parsedAward = {
@@ -744,8 +935,10 @@ window.LinkedinToResumeJson = (() => {
                     awarder: award.issuer,
                     summary: noNullOrUndef(award.description)
                 };
-                if (award.issueDate && typeof award.issueDate === 'object') {
-                    parsedAward.date = parseDate(award.issueDate);
+                // profileView vs dash key
+                const issueDateObject = award.issueDate || award.issuedOn;
+                if (issueDateObject && typeof issueDateObject === 'object') {
+                    parsedAward.date = parseDate(issueDateObject);
                 }
                 _outputJsonStable.awards.push(parsedAward);
                 _outputJsonLatest.awards.push(parsedAward);
@@ -753,7 +946,7 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.sections.awards = awardEntries.length ? 'success' : 'empty';
 
             // Parse publications
-            const publicationEntries = db.getValuesByKey(_liSchemaKeys.publications);
+            const publicationEntries = db.getValuesByKey(_liTypeMappings.publications.tocKeys);
             publicationEntries.forEach((publication) => {
                 /** @type {ResumeSchemaStable['publications'][0]} */
                 const parsedPublication = {
@@ -763,8 +956,10 @@ window.LinkedinToResumeJson = (() => {
                     website: noNullOrUndef(publication.url),
                     summary: noNullOrUndef(publication.description)
                 };
-                if (publication.date && typeof publication.date === 'object' && typeof publication.date.year !== 'undefined') {
-                    parsedPublication.releaseDate = parseDate(publication.date);
+                // profileView vs dash key
+                const publicationDateObj = publication.date || publication.publishedOn;
+                if (publicationDateObj && typeof publicationDateObj === 'object' && typeof publicationDateObj.year !== 'undefined') {
+                    parsedPublication.releaseDate = parseDate(publicationDateObj);
                 }
                 _outputJsonStable.publications.push(parsedPublication);
                 _outputJsonLatest.publications.push({
@@ -818,6 +1013,7 @@ window.LinkedinToResumeJson = (() => {
         this.lastScannedLocale = null;
         /** @type {string | null} */
         this.preferLocale = null;
+        _defaultLocale = this.getViewersLocalLang();
         this.scannedPageUrl = '';
         this.parseSuccess = false;
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
@@ -825,7 +1021,19 @@ window.LinkedinToResumeJson = (() => {
         this.debug = typeof OPT_debug === 'boolean' ? OPT_debug : false;
         if (this.debug) {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
-            this.buildDbFromLiSchema = buildDbFromLiSchema;
+            this.internals = {
+                buildDbFromLiSchema,
+                parseProfileSchemaJSON,
+                _defaultLocale,
+                _liSchemaKeys,
+                _liTypeMappings,
+                _voyagerEndpoints,
+                output: {
+                    _outputJsonStable,
+                    _outputJsonLatest,
+                    _outputJsonBetaPartial
+                }
+            };
         }
         this.debugConsole = {
             /** @type {(...args: any[]) => void} */
@@ -1247,7 +1455,7 @@ window.LinkedinToResumeJson = (() => {
      */
     LinkedinToResumeJson.prototype.getProfileResponseSummary = async function getProfileResponseSummary(useCache = true, optLocale) {
         const localeToUse = optLocale || this.preferLocale;
-        const localeMatchesUser = !localeToUse || optLocale === this.getViewersLocalLang();
+        const localeMatchesUser = !localeToUse || optLocale === _defaultLocale;
 
         if (this.profileParseSummary && useCache) {
             const { pageUrl, localeStr, parseSuccess } = this.profileParseSummary;
@@ -1270,11 +1478,29 @@ window.LinkedinToResumeJson = (() => {
         }
 
         // Get directly via API
-        const fullProfileView = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+        /** @type {'profileView' | 'dashFullProfileWithEntities'} */
+        let endpointType = 'profileView';
+        /** @type {LiResponse} */
+        let profileResponse;
+        if (!localeMatchesUser) {
+            /**
+             * LI acts strange if user is a multilingual user, with defaultLocale different than the resource being requested. It will *not* respect x-li-lang header for profileView, and you instead have to use the Dash fullprofile endpoint
+             */
+            endpointType = 'dashFullProfileWithEntities';
+            profileResponse = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile);
+        } else {
+            // use normal profileView
+            profileResponse = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);
+        }
+
         // Try to use the same parser that I use for embedded
-        const profileParserResult = await parseProfileSchemaJSON(this, fullProfileView);
+        const profileParserResult = await parseProfileSchemaJSON(this, profileResponse, endpointType);
+
         if (profileParserResult.parseSuccess) {
-            this.debugConsole.log('getProfileResponse - Used API. Sucess');
+            this.debugConsole.log('getProfileResponse - Used API. Sucess', {
+                profileResponse,
+                endpointType
+            });
             this.profileParseSummary = profileParserResult;
             return this.profileParseSummary;
         }
@@ -1509,9 +1735,11 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Get the local language identifier of the *viewer* (not profile)
+     *  - This should correspond to LI's defaultLocale, which persists, even across user configuration changes
      * @returns {string}
      */
     LinkedinToResumeJson.prototype.getViewersLocalLang = () => {
+        // This *seems* to correspond with profile.defaultLocale, but I'm not 100% sure
         const metaTag = document.querySelector('meta[name="i18nDefaultLocale"]');
         /** @type {HTMLSelectElement | null} */
         const selectTag = document.querySelector('select#globalfooter-select_language');
@@ -1527,20 +1755,21 @@ window.LinkedinToResumeJson = (() => {
 
     /**
      * Get the locales that the *current* profile (natively) supports (based on `supportedLocales`)
+     * Note: Uses cache
      * @returns {Promise<string[]>}
      */
     LinkedinToResumeJson.prototype.getSupportedLocales = async function getSupportedLocales() {
-        /** @type {string[]} */
-        let supportedLocales = [];
-        const { profileObj } = await this.getProfileResponseSummary();
-        const profileDb = buildDbFromLiSchema(profileObj);
-        const userDetails = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
-        if (userDetails && Array.isArray(userDetails['supportedLocales'])) {
-            supportedLocales = userDetails.supportedLocales.map((locale) => {
-                return `${locale.language}_${locale.country}`;
-            });
+        if (!_supportedLocales.length) {
+            const { profileObj } = await this.getProfileResponseSummary();
+            const profileDb = buildDbFromLiSchema(profileObj);
+            const userDetails = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
+            if (userDetails && Array.isArray(userDetails['supportedLocales'])) {
+                _supportedLocales = userDetails.supportedLocales.map((locale) => {
+                    return `${locale.language}_${locale.country}`;
+                });
+            }
         }
-        return supportedLocales;
+        return _supportedLocales;
     };
 
     /**
@@ -1853,7 +2082,13 @@ window.LinkedinToResumeJson = (() => {
                     } else {
                         response.text().then((text) => {
                             try {
+                                /** @type {LiResponse} */
                                 const parsed = JSON.parse(text);
+                                if (!!_this.preferLocale && _this.preferLocale !== _defaultLocale) {
+                                    _this.debugConsole.log(`Checking for locale mapping and remapping if found.`);
+                                    remapNestedLocale(parsed.included, this.preferLocale, true);
+                                }
+
                                 resolve(parsed);
                             } catch (e) {
                                 console.warn('Error parsing internal API response', response, e);

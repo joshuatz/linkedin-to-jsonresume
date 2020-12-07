@@ -37,6 +37,7 @@ declare global {
     interface LiEntity {
         $type: string;
         entityUrn: LiUrn;
+        objectUrn?: LiUrn;
         [key: string]: any;
         paging?: LiPaging;
     }
@@ -82,9 +83,9 @@ declare global {
         // Methods
         getElementKeys: () => string[];
         getElements: () => Array<LiEntity & {key: LIUrn}>;
-        getValueByKey: (key: string) => LiEntity;
-        getValuesByKey: (key: LiUrn, optTocValModifier?: TocValModifier) => LiEntity[];
-        getElementsByType: (typeStr: string) => LiEntity[];
+        getValueByKey: (key: string | string[]) => LiEntity;
+        getValuesByKey: (key: LiUrn | LiUrn[], optTocValModifier?: TocValModifier) => LiEntity[];
+        getElementsByType: (typeStr: string | string []) => LiEntity[];
         getElementByUrn: (urn: string) => LiEntity | undefined;
         /**
          * Get multiple elements by URNs
@@ -116,6 +117,7 @@ declare global {
     type CaptureResult = 'success' | 'fail' | 'incomplete' | 'empty';
 
     interface ParseProfileSchemaResultSummary {
+        liResponse: LiResponse;
         profileObj: LiResponse;
         pageUrl: string;
         localeStr?: string;

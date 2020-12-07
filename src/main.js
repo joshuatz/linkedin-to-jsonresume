@@ -5,9 +5,22 @@
  * WARNING: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not resonsible for any misuse, or reprecussions of said misuse.
  */
 
-const VCardsJS = require('@dan/vcards');
-const { resumeJsonTemplateLatest, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } = require('./templates');
-const { liSchemaKeys: _liSchemaKeys, liTypeMappings: _liTypeMappings } = require('./schema');
+import VCardsJS from '@dan/vcards';
+import { resumeJsonTemplateLatest, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } from './templates';
+import { liSchemaKeys as _liSchemaKeys, liTypeMappings as _liTypeMappings } from './schema';
+import {
+    getCookie,
+    lazyCopy,
+    liDateToJSDate,
+    noNullOrUndef,
+    parseDate,
+    promptDownload,
+    setQueryParams,
+    urlToBase64,
+    remapNestedLocale,
+    companyLiPageFromCompanyUrn,
+    parseAndAttachResumeDates
+} from './utilities';
 
 // ==Bookmarklet==
 // @name linkedin-to-jsonresume-bookmarklet
@@ -17,106 +30,6 @@ const { liSchemaKeys: _liSchemaKeys, liTypeMappings: _liTypeMappings } = require
 // @ts-ignore
 window.LinkedinToResumeJson = (() => {
     // private
-    /** @type {{[key: number]: number}} */
-    const maxDaysOfMonth = {
-        1: 31,
-        2: 28,
-        3: 31,
-        4: 30,
-        5: 31,
-        6: 30,
-        7: 31,
-        8: 31,
-        9: 30,
-        10: 31,
-        11: 30,
-        12: 31
-    };
-
-    /**
-     * If less than 10, zero pad left
-     * @param {number} n - Numerical input
-     * @returns {string} Left padded, stringified num
-     */
-    const zeroLeftPad = (n) => {
-        if (n < 10) {
-            return `0${n}`;
-        }
-
-        return n.toString();
-    };
-
-    /**
-     * Returns month, padded to two digits
-     * @param {Number} [m] month
-     * @returns {string} month, padded to two digits
-     */
-    const getMonth = (m) => {
-        if (!m) return `12`;
-
-        return zeroLeftPad(m);
-    };
-
-    /**
-     * Gets day, padded to two digits
-     * @param {Number} d day
-     * @param {Number} m month
-     * @returns {string} day, padded to two digits
-     */
-    const getDay = (d, m) => {
-        if (!d) {
-            if (!m) return `31`;
-            return maxDaysOfMonth[m].toString();
-        }
-
-        return zeroLeftPad(d);
-    };
-
-    /**
-     * Parses an object with year, month and day and returns a string with the date.
-     * If month is not present, should return 12, and if day is not present, should return last month day.
-     * @param {LiDate} dateObj
-     * @returns {string} Date, as string, formatted for JSONResume
-     */
-    const parseDate = (dateObj) => (dateObj && dateObj.year ? `${dateObj.year}-${getMonth(dateObj.month)}-${getDay(dateObj.day, dateObj.month)}` : '');
-
-    /**
-     * Converts a LI Voyager style date object into a native JS Date object
-     * @param {LiDate} liDateObj
-     * @returns {Date} date object
-     */
-    const liDateToJSDate = (liDateObj) => {
-        // This is a cheat; by passing string + 00:00, we can force Date to not offset (by timezone), and also treat month as NOT zero-indexed, which is how LI uses it
-        return new Date(`${parseDate(liDateObj)} 00:00`);
-    };
-
-    /**
-     * Trigger a file download prompt with given content
-     * @see https://davidwalsh.name/javascript-download
-     * @param {string} data
-     * @param {string} fileName
-     * @param {string} [type]
-     */
-    const promptDownload = (data, fileName, type = 'text/plain') => {
-        // Create an invisible A element
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        document.body.appendChild(a);
-
-        // Set the HREF to a Blob representation of the data to be downloaded
-        a.href = window.URL.createObjectURL(new Blob([data], { type }));
-
-        // Use download attribute to set set desired file name
-        a.setAttribute('download', fileName);
-
-        // Trigger download by simulating click
-        a.click();
-
-        // Cleanup
-        window.URL.revokeObjectURL(a.href);
-        document.body.removeChild(a);
-    };
-
     /** @type {ResumeSchemaStable} */
     let _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
     /** @type {ResumeSchemaLatest} */
@@ -146,86 +59,6 @@ window.LinkedinToResumeJson = (() => {
     let _scrolledToLoad = false;
     const _toolPrefix = 'jtzLiToResumeJson';
     const _stylesInjected = false;
-
-    /**
-     * Get a cookie by name
-     * @param {string} name
-     */
-    function getCookie(name) {
-        const v = document.cookie.match(`(^|;) ?${name}=([^;]*)(;|$)`);
-        return v ? v[2] : null;
-    }
-
-    /**
-     * Get URL response as base64
-     * @param {string} url - URL to convert
-     * @param {boolean} [omitDeclaration] - remove the `data:...` declaration prefix
-     * @returns {Promise<{dataStr: string, mimeStr: string}>} base64 results
-     */
-    async function urlToBase64(url, omitDeclaration = false) {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const declarationPatt = /^data:([^;]+)[^,]+base64,/i;
-                let dataStr = /** @type {string} */ (reader.result);
-                const mimeStr = dataStr.match(declarationPatt)[1];
-                if (omitDeclaration) {
-                    dataStr = dataStr.replace(declarationPatt, '');
-                }
-
-                resolve({
-                    dataStr,
-                    mimeStr
-                });
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    }
-
-    /**
-     * Set multiple query string params by passing an object
-     * @param {string} url
-     * @param {Record<string, any>} paramPairs
-     */
-    function setQueryParams(url, paramPairs) {
-        const urlInstance = new URL(url);
-        /** @type {Record<string, any>} */
-        const existingQueryPairs = {};
-        urlInstance.searchParams.forEach((val, key) => {
-            existingQueryPairs[key] = val;
-        });
-        urlInstance.search = new URLSearchParams({
-            ...existingQueryPairs,
-            ...paramPairs
-        }).toString();
-        return urlInstance.toString();
-    }
-
-    /**
-     * Replace a value with a default if it is null or undefined
-     * @param {any} value
-     * @param {any} [optDefaultVal]
-     */
-    function noNullOrUndef(value, optDefaultVal) {
-        const defaultVal = optDefaultVal || '';
-        return typeof value === 'undefined' || value === null ? defaultVal : value;
-    }
-
-    /**
-     * Copy with `json.parse(json.stringify())`
-     * @template T
-     * @param {T & Record<string, any>} inputObj
-     * @param {Array<keyof T>} [removeKeys] properties (top-level only) to remove
-     * @returns {T}
-     */
-    function lazyCopy(inputObj, removeKeys = []) {
-        const copied = JSON.parse(JSON.stringify(inputObj));
-        removeKeys.forEach((k) => delete copied[k]);
-        return copied;
-    }
 
     /**
      * Builds a mini-db out of a LI schema obj
@@ -362,57 +195,6 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
-     * "Remaps" data that is nested under a multilingual wrapper, hoisting it
-     * back up to top-level keys (overwriting existing values).
-     *
-     * WARNING: Modifies object IN PLACE
-     * @example
-     * ```js
-     * const input = {
-     *     firstName: 'Алексе́й',
-     *     multiLocaleFirstName: {
-     *         ru_RU: 'Алексе́й',
-     *         en_US: 'Alexey'
-     *     }
-     * }
-     * console.log(remapNestedLocale(input, 'en_US').firstName);
-     * // 'Alexey'
-     * ```
-     * @param {LiEntity | LiEntity[]} liObject The LI response object(s) to remap
-     * @param {string} desiredLocale Desired Locale string (LI format / ISO-3166-1). Defaults to instance property
-     * @param {boolean} [deep] Run remapper recursively, replacing at all applicable levels
-     */
-    function remapNestedLocale(liObject, desiredLocale, deep = true) {
-        if (Array.isArray(liObject)) {
-            liObject.forEach((o) => {
-                remapNestedLocale(o, desiredLocale, deep);
-            });
-        } else {
-            Object.keys(liObject).forEach((prop) => {
-                const nestedVal = liObject[prop];
-                if (!!nestedVal && typeof nestedVal === 'object') {
-                    // Test for locale wrapped property
-                    // example: `multiLocaleFirstName`
-                    if (prop.startsWith('multiLocale')) {
-                        /** @type {Record<string, any>} */
-                        const localeMap = nestedVal;
-                        // eslint-disable-next-line no-prototype-builtins
-                        if (localeMap.hasOwnProperty(desiredLocale)) {
-                            // Transform multiLocaleFirstName to firstName
-                            const nonPrefixedKeyPascalCase = prop.replace(/multiLocale/i, '');
-                            const nonPrefixedKeyLowerCamelCase = nonPrefixedKeyPascalCase.charAt(0).toLocaleLowerCase() + nonPrefixedKeyPascalCase.substring(1);
-                            // Remap nested value to top level
-                            liObject[nonPrefixedKeyLowerCamelCase] = localeMap[desiredLocale];
-                        }
-                    } else if (deep) {
-                        remapNestedLocale(liObject[prop], desiredLocale, deep);
-                    }
-                }
-            });
-        }
-    }
-
-    /**
      * Gets the profile ID from embedded (or api returned) Li JSON Schema
      * @param {LiResponse} jsonSchema
      * @returns {string} profileId
@@ -433,21 +215,6 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
-     * Retrieve a LI Company Page URL from a company URN
-     * @param {string} companyUrn
-     */
-    function companyLiPageFromCompanyUrn(companyUrn) {
-        let companyPageUrl = '';
-        if (typeof companyUrn === 'string') {
-            const companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
-            if (companyIdMatch) {
-                companyPageUrl = `https://www.linkedin.com/company/${companyIdMatch[1]}`;
-            }
-        }
-        return companyPageUrl;
-    }
-
-    /**
      * Push a new skill to the resume object
      * @param {string} skillName
      */
@@ -464,30 +231,6 @@ window.LinkedinToResumeJson = (() => {
             };
             _outputJsonStable.skills.push(formattedSkill);
             _outputJsonLatest.skills.push(formattedSkill);
-        }
-    }
-
-    /**
-     * Since LI entities can store dates in different ways, but
-     * JSONResume only stores in one, this utility method will detect
-     * which format LI is using, parse it, and attach to Resume object
-     * (e.g. work position entry), with correct date format
-     *  - NOTE: This modifies object in-place
-     * @param {GenObj} resumeObj
-     * @param {LiEntity} liEntity
-     */
-    function parseAndAttachResumeDates(resumeObj, liEntity) {
-        // Time period can either come as `timePeriod` or `dateRange` prop
-        const timePeriod = liEntity.timePeriod || liEntity.dateRange;
-        if (timePeriod) {
-            const start = timePeriod.startDate || timePeriod.start;
-            const end = timePeriod.endDate || timePeriod.end;
-            if (end) {
-                resumeObj.endDate = parseDate(end);
-            }
-            if (start) {
-                resumeObj.startDate = parseDate(start);
-            }
         }
     }
 

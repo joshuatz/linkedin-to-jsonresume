@@ -1,5 +1,5 @@
 /** @type {Required<ResumeSchemaStable>} */
-const resumeJsonTemplateStable = {
+export const resumeJsonTemplateStable = {
     basics: {
         name: '',
         label: '',
@@ -29,7 +29,7 @@ const resumeJsonTemplateStable = {
 };
 
 /** @type {Required<ResumeSchemaLatest>} */
-const resumeJsonTemplateLatest = {
+export const resumeJsonTemplateLatest = {
     $schema: 'https://json.schemastore.org/resume',
     basics: {
         name: '',
@@ -68,12 +68,6 @@ const resumeJsonTemplateLatest = {
  * Beta can be combined with latest, so this is a partial (diff)
  * @type {Partial<ResumeSchemaBeyondSpec>}
  */
-const resumeJsonTemplateBetaPartial = {
+export const resumeJsonTemplateBetaPartial = {
     certificates: []
-};
-
-module.exports = {
-    resumeJsonTemplateStable,
-    resumeJsonTemplateLatest,
-    resumeJsonTemplateBetaPartial
 };

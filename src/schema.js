@@ -1,7 +1,7 @@
 /**
  * Lookup keys for the standard profileView object
  */
-const liSchemaKeys = {
+export const liSchemaKeys = {
     profile: '*profile',
     certificates: '*certificationView',
     education: '*educationView',
@@ -20,7 +20,7 @@ const liSchemaKeys = {
  *  - Try to put dash strings last, profileView first
  *  - Most recipes are dash only
  */
-const liTypeMappings = {
+export const liTypeMappings = {
     profile: {
         // There is no tocKey for profile in dash FullProfileWithEntries,
         // due to how entry-point is configured
@@ -83,9 +83,4 @@ const liTypeMappings = {
         types: ['com.linkedin.voyager.identity.profile.Publication', 'com.linkedin.voyager.dash.identity.profile.Publication'],
         recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePublication']
     }
-};
-
-module.exports = {
-    liSchemaKeys,
-    liTypeMappings
 };

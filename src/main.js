@@ -7,6 +7,7 @@
 
 const VCardsJS = require('@dan/vcards');
 const { resumeJsonTemplateLatest, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } = require('./templates');
+const { liSchemaKeys: _liSchemaKeys, liTypeMappings: _liTypeMappings } = require('./schema');
 
 // ==Bookmarklet==
 // @name linkedin-to-jsonresume-bookmarklet
@@ -126,92 +127,6 @@ window.LinkedinToResumeJson = (() => {
     let _supportedLocales = [];
     /** @type {string} */
     let _defaultLocale = `en_US`;
-    /**
-     * Lookup keys for the standard profileView object
-     */
-    const _liSchemaKeys = {
-        profile: '*profile',
-        certificates: '*certificationView',
-        education: '*educationView',
-        workPositions: '*positionView',
-        workPositionGroups: '*positionGroupView',
-        skills: '*skillView',
-        projects: '*projectView',
-        attachments: '*summaryTreasuryMedias',
-        volunteerWork: '*volunteerExperienceView',
-        awards: '*honorView',
-        publications: '*publicationView'
-    };
-    /**
-     * Try to maintain a mapping between generic section types, and LI's schema
-     *  - tocKeys are pointers that often point to a collection of URNs
-     *  - Try to put dash strings last, profileView first
-     *  - Most recipes are dash only
-     */
-    const _liTypeMappings = {
-        profile: {
-            // There is no tocKey for profile in dash FullProfileWithEntries,
-            // due to how entry-point is configured
-            tocKeys: ['*profile'],
-            types: [
-                // regular profileView
-                'com.linkedin.voyager.identity.profile.Profile',
-                // dash FullProfile
-                'com.linkedin.voyager.dash.identity.profile.Profile'
-            ],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities']
-        },
-        certificates: {
-            tocKeys: ['*certificationView', '*profileCertifications'],
-            types: ['com.linkedin.voyager.dash.identity.profile.Certification'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileCertification']
-        },
-        education: {
-            tocKeys: ['*educationView', '*profileEducations'],
-            types: [
-                'com.linkedin.voyager.identity.profile.Education',
-                // Dash
-                'com.linkedin.voyager.dash.identity.profile.Education'
-            ],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileEducation']
-        },
-        // Individual work entries (not aggregate (workgroup) with date range)
-        workPositions: {
-            tocKeys: ['*positionView', '*profilePositionGroups'],
-            types: ['com.linkedin.voyager.identity.profile.Position', 'com.linkedin.voyager.dash.identity.profile.Position'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePosition']
-        },
-        skills: {
-            tocKeys: ['*skillView', '*profileSkills'],
-            types: ['com.linkedin.voyager.identity.profile.Skill', 'com.linkedin.voyager.dash.identity.profile.Skill'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileSkill']
-        },
-        projects: {
-            tocKeys: ['*projectView', '*profileProjects'],
-            types: ['com.linkedin.voyager.identity.profile.Project', 'com.linkedin.voyager.dash.identity.profile.Project'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileProject']
-        },
-        attachments: {
-            tocKeys: ['*summaryTreasuryMedias', '*profileTreasuryMediaPosition'],
-            types: ['com.linkedin.voyager.identity.profile.Certification', 'com.linkedin.voyager.dash.identity.profile.treasury.TreasuryMedia'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileTreasuryMedia']
-        },
-        volunteerWork: {
-            tocKeys: ['*volunteerExperienceView', '*profileVolunteerExperiences'],
-            types: ['com.linkedin.voyager.dash.identity.profile.VolunteerExperience'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileVolunteerExperience']
-        },
-        awards: {
-            tocKeys: ['*honorView', '*profileHonors'],
-            types: ['com.linkedin.voyager.identity.profile.Honor', 'com.linkedin.voyager.dash.identity.profile.Honor'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileHonor']
-        },
-        publications: {
-            tocKeys: ['*publicationView', '*profilePublications'],
-            types: ['com.linkedin.voyager.identity.profile.Publication', 'com.linkedin.voyager.dash.identity.profile.Publication'],
-            recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePublication']
-        }
-    };
     const _voyagerBase = 'https://www.linkedin.com/voyager/api';
     const _voyagerEndpoints = {
         following: '/identity/profiles/{profileId}/following',
@@ -1825,10 +1740,9 @@ window.LinkedinToResumeJson = (() => {
             // Get via miniProfile entity in full profile db
             const { liResponse, profileSrc, profileInfoObj } = await this.getParsedProfile();
             const profileDb = buildDbFromLiSchema(liResponse);
-            const fullProfile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
             let pictureMeta;
             if (profileSrc === 'profileView') {
-                const miniProfile = profileDb.getElementByUrn(fullProfile['*miniProfile']);
+                const miniProfile = profileDb.getElementByUrn(profileInfoObj['*miniProfile']);
                 if (miniProfile && !!miniProfile.picture) {
                     pictureMeta = miniProfile.picture;
                 }
@@ -1844,22 +1758,22 @@ window.LinkedinToResumeJson = (() => {
     };
 
     LinkedinToResumeJson.prototype.generateVCard = async function generateVCard() {
-        const { liResponse } = await this.getParsedProfile();
+        const profileResSummary = await this.getParsedProfile();
         const contactInfoObj = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
-        this.exportVCard(liResponse, contactInfoObj);
+        this.exportVCard(profileResSummary, contactInfoObj);
     };
 
     /**
-     * @param {LiResponse} profileResponse
+     * @param {ParseProfileSchemaResultSummary} profileResult
      * @param {LiResponse} contactInfoObj
      */
-    LinkedinToResumeJson.prototype.exportVCard = async function exportVCard(profileResponse, contactInfoObj) {
+    LinkedinToResumeJson.prototype.exportVCard = async function exportVCard(profileResult, contactInfoObj) {
         const vCard = VCardsJS();
-        const profileDb = buildDbFromLiSchema(profileResponse);
+        const profileDb = buildDbFromLiSchema(profileResult.liResponse);
         const contactDb = buildDbFromLiSchema(contactInfoObj);
         // Contact info is stored directly in response; no lookup
         const contactInfo = /** @type {LiProfileContactInfoResponse['data']} */ (contactDb.tableOfContents);
-        const profile = profileDb.getValuesByKey(_liSchemaKeys.profile)[0];
+        const profile = profileResult.profileInfoObj;
         vCard.formattedName = `${profile.firstName} ${profile.lastName}`;
         vCard.firstName = profile.firstName;
         vCard.lastName = profile.lastName;
@@ -1871,7 +1785,7 @@ window.LinkedinToResumeJson = (() => {
         vCard.email = contactInfo.emailAddress;
         if (contactInfo.twitterHandles.length) {
             // @ts-ignore
-            vCard.socialUrls['twitter'] = `https://twitter.com/${contactInfo.twitterHandles[0]}`;
+            vCard.socialUrls['twitter'] = `https://twitter.com/${contactInfo.twitterHandles[0].name}`;
         }
         if (contactInfo.phoneNumbers) {
             contactInfo.phoneNumbers.forEach((numberObj) => {
@@ -1902,7 +1816,7 @@ window.LinkedinToResumeJson = (() => {
             }
         }
         // Try to get currently employed organization
-        const positions = profileDb.getValuesByKey(_liSchemaKeys.workPositions);
+        const positions = profileDb.getElementsByType(_liTypeMappings.workPositions.types);
         if (positions.length) {
             vCard.organization = positions[0].companyName;
             vCard.title = positions[0].title;
@@ -1934,7 +1848,7 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     *
+     * API fetching, with auto pagination
      * @param {string} fetchEndpoint
      * @param {Record<string, string | number>} [optHeaders]
      * @param {number} [start]
@@ -2082,7 +1996,6 @@ window.LinkedinToResumeJson = (() => {
                     method: 'GET',
                     mode: 'cors'
                 };
-                _this.debugConsole.log(`Fetching: ${endpoint}`, fetchOptions);
                 fetch(endpoint, fetchOptions).then((response) => {
                     if (response.status !== 200) {
                         const errStr = 'Error fetching internal API endpoint';

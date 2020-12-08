@@ -37,6 +37,8 @@ The dropdown should automatically get populated with the languages that the prof
 
 > Note: LinkedIn offers language choices through [a `Locale` string](https://developer.linkedin.com/docs/ref/v2/object-types#LocaleString), which is a combination of `country` (ISO-3166) and `language` (ISO-639). I do not make decisions as to what languages are supported.
 
+> This feature is the part of this extension most likely to break in the future; LI has some serious quirks around multilingual profiles - see [my notes](./LinkedIn-Notes.md#voyager---multilingual-and-locales-support) for details.
+
 ### Export Options
 There are several main buttons in the browser extension, with different effects. You can hover over each button to see the alt text describing what they do, or read below:
  - *LinkedIn Profile to JSON*: Converts the profile to the JSON Resume format, and then displays it in a popup modal for easy copying and pasting
@@ -71,6 +73,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+12/7/2020 | 2.1.0 | Fix: Issue with multilingual profile, when exporting your own profile with a different locale than your profile's default. ([#37](https://github.com/joshuatz/linkedin-to-jsonresume/pull/37))
 11/12/2020 | 2.0.0 | Support for multiple schema versions ✨ ([#34](https://github.com/joshuatz/linkedin-to-jsonresume/pull/34))
 11/8/2020 | 1.5.1 | Fix: Omit partial BDAY export in vCard ([#32](https://github.com/joshuatz/linkedin-to-jsonresume/issues/32))
 10/22/2020 | 1.5.0 | Fix: Incorrect birthday month in exported vCards (off by one)<br>Fix: Better pattern for extracting profile ID from URL, fixes extracting from virtual sub-pages of profile (e.g. `/detail/contact-info`), or with query or hash strings at the end.

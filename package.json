@@ -1,6 +1,6 @@
 {
     "name": "linkedin-to-json-resume-exporter",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Browser tool to grab details from your open LinkedIn profile page and export to JSON Resume Schema",
     "private": true,
     "main": "src/main.js",
@@ -15,7 +15,10 @@
         "package-browserext": "node ./build-scripts/prep-dirs.js && npm run build-browserext && node ./build-scripts/package-browserext.js",
         "copy-debug-js-win": "yarn build-browserext-debug && less build/main.js | CLIP"
     },
-    "author": "Joshua Tzucker",
+    "author": {
+        "name": "Joshua Tzucker",
+        "url": "https://joshuatz.com/?utm_source=package"
+    },
     "license": "MIT",
     "devDependencies": {
         "@babel/cli": "^7.12.1",

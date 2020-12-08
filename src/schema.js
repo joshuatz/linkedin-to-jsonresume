@@ -47,6 +47,11 @@ export const liTypeMappings = {
         ],
         recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileEducation']
     },
+    courses: {
+        tocKeys: ['*courseView', '*profileCourses'],
+        types: ['com.linkedin.voyager.identity.profile.Course', 'com.linkedin.voyager.dash.identity.profile.Course'],
+        recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileCourse']
+    },
     // Individual work entries (not aggregate (workgroup) with date range)
     workPositions: {
         tocKeys: ['*positionView', '*profilePositionGroups'],

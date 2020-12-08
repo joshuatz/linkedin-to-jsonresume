@@ -234,16 +234,23 @@ export function remapNestedLocale(liObject, desiredLocale, deep = true) {
 /**
  * Retrieve a LI Company Page URL from a company URN
  * @param {string} companyUrn
+ * @param {InternalDb} db
  */
-export function companyLiPageFromCompanyUrn(companyUrn) {
-    let companyPageUrl = '';
+export function companyLiPageFromCompanyUrn(companyUrn, db) {
     if (typeof companyUrn === 'string') {
-        const companyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
-        if (companyIdMatch) {
-            companyPageUrl = `https://www.linkedin.com/company/${companyIdMatch[1]}`;
+        // Dash
+        const company = db.getElementByUrn(companyUrn);
+        if (company && company.url) {
+            return company.url;
+        }
+
+        // profileView
+        const linkableCompanyIdMatch = /urn.+Company:(\d+)/.exec(companyUrn);
+        if (linkableCompanyIdMatch) {
+            return `https://www.linkedin.com/company/${linkableCompanyIdMatch[1]}`;
         }
     }
-    return companyPageUrl;
+    return '';
 }
 
 /**

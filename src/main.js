@@ -264,6 +264,17 @@ window.LinkedinToResumeJson = (() => {
                     _this.debugConsole.warn('could not find course:', courseKey);
                 }
             });
+        } else {
+            // new version (Dash) of education <--> course relationship
+            // linked on "union" field, instead of directly, so have to iterate
+            db.getElementsByType(_liTypeMappings.courses.types).forEach((c) => {
+                if (c.occupationUnion && c.occupationUnion.profileEducation) {
+                    if (c.occupationUnion.profileEducation === edu.entityUrn) {
+                        // union joined!
+                        parsedEdu.courses.push(`${c.number} - ${c.name}`);
+                    }
+                }
+            });
         }
         // Push to final json
         _outputJsonStable.education.push(parsedEdu);
@@ -274,8 +285,9 @@ window.LinkedinToResumeJson = (() => {
     /**
      * Parse a LI position object and push the parsed work entry to Resume
      * @param {LiEntity} positionObj
+     * @param {InternalDb} db
      */
-    function parseAndPushPosition(positionObj) {
+    function parseAndPushPosition(positionObj, db) {
         /** @type {ResumeSchemaStable['work'][0]} */
         const parsedWork = {
             company: positionObj.companyName,
@@ -284,7 +296,7 @@ window.LinkedinToResumeJson = (() => {
             position: positionObj.title,
             startDate: '',
             summary: positionObj.description,
-            website: companyLiPageFromCompanyUrn(positionObj['companyUrn'])
+            website: companyLiPageFromCompanyUrn(positionObj['companyUrn'], db)
         };
         parseAndAttachResumeDates(parsedWork, positionObj);
         // Lookup company website
@@ -494,7 +506,7 @@ window.LinkedinToResumeJson = (() => {
             if (allWorkCanBeCaptured) {
                 const workPositions = db.getElementsByType(_liTypeMappings.workPositions.types);
                 workPositions.forEach((position) => {
-                    parseAndPushPosition(position);
+                    parseAndPushPosition(position, db);
                 });
                 _this.debugConsole.log(`All work positions captured directly from profile result.`);
                 resultSummary.sections.work = 'success';
@@ -510,7 +522,7 @@ window.LinkedinToResumeJson = (() => {
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
                     position: volunteering.role,
-                    website: companyLiPageFromCompanyUrn(volunteering['companyUrn']),
+                    website: companyLiPageFromCompanyUrn(volunteering['companyUrn'], db),
                     startDate: '',
                     endDate: '',
                     summary: volunteering.description,
@@ -676,6 +688,8 @@ window.LinkedinToResumeJson = (() => {
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
         this.preferApi = typeof OPT_preferApi === 'boolean' ? OPT_preferApi : true;
         this.debug = typeof OPT_debug === 'boolean' ? OPT_debug : false;
+        // Force use of newer Dash endpoints when possible, for debuggin
+        this.preferDash = this.debug && /forceDashEndpoint=true/i.test(document.location.href);
         if (this.debug) {
             console.warn('LinkedinToResumeJson - DEBUG mode is ON');
             this.internals = {
@@ -973,7 +987,7 @@ window.LinkedinToResumeJson = (() => {
                     if (collectionResponse && Array.isArray(collectionResponse['*elements'])) {
                         db.getElementsByUrns(collectionResponse['*elements']).forEach((position) => {
                             // This is *finally* the "Position" element
-                            parseAndPushPosition(position);
+                            parseAndPushPosition(position, db);
                         });
                     }
                 });
@@ -1108,7 +1122,7 @@ window.LinkedinToResumeJson = (() => {
      */
     LinkedinToResumeJson.prototype.getParsedProfile = async function getParsedProfile(useCache = true, optLocale) {
         const localeToUse = optLocale || this.preferLocale;
-        const localeMatchesUser = !localeToUse || optLocale === _defaultLocale;
+        const localeMatchesUser = !localeToUse || localeToUse === _defaultLocale;
 
         if (this.profileParseSummary && useCache) {
             const { pageUrl, localeStr, parseSuccess } = this.profileParseSummary;
@@ -1135,10 +1149,10 @@ window.LinkedinToResumeJson = (() => {
         let endpointType = 'profileView';
         /** @type {LiResponse} */
         let profileResponse;
-        if (!localeMatchesUser) {
-            /**
-             * LI acts strange if user is a multilingual user, with defaultLocale different than the resource being requested. It will *not* respect x-li-lang header for profileView, and you instead have to use the Dash fullprofile endpoint
-             */
+        /**
+         * LI acts strange if user is a multilingual user, with defaultLocale different than the resource being requested. It will *not* respect x-li-lang header for profileView, and you instead have to use the Dash fullprofile endpoint
+         */
+        if (!localeMatchesUser || this.preferDash === true) {
             endpointType = 'dashFullProfileWithEntities';
             profileResponse = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile);
         } else {

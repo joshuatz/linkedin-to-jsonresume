@@ -114,7 +114,8 @@ window.LinkedinToResumeJson = (() => {
             });
         };
         /**
-         * Get all elements that match type. Should usually just be one
+         * Get all elements that match type.
+         * WARNING: Since this gets elements directly by simply iterating through all results, not via ToC, order of entities returned is simply whatever order LI provides them in the response. Not guaranteed to be in order! Use a ToC approach if you need ordered results.
          * @param {string | string[]} typeStr - Type, e.g. `$com.linkedin...`
          * @returns {LiEntity[]}
          */
@@ -368,7 +369,8 @@ window.LinkedinToResumeJson = (() => {
                 }
                 // To make this easier to work with lookup, we'll unpack the
                 // profile view nested object BACK into the root (ToC), so
-                // that lookups can be performed by key instead of type | recipe
+                // that subsequent lookups can be performed by key instead of type | recipe
+                // This is critical for lookups that require precise ordering, preserved by ToCs
                 /** @type {LiResponse} */
                 const hoistedRes = {
                     data: {
@@ -504,7 +506,7 @@ window.LinkedinToResumeJson = (() => {
                 allWorkCanBeCaptured = paging.start + paging.count >= paging.total;
             }
             if (allWorkCanBeCaptured) {
-                const workPositions = db.getElementsByType(_liTypeMappings.workPositions.types);
+                const workPositions = db.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
                 workPositions.forEach((position) => {
                     parseAndPushPosition(position, db);
                 });
@@ -1573,7 +1575,7 @@ window.LinkedinToResumeJson = (() => {
             }
         }
         // Try to get currently employed organization
-        const positions = profileDb.getElementsByType(_liTypeMappings.workPositions.types);
+        const positions = profileDb.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
         if (positions.length) {
             vCard.organization = positions[0].companyName;
             vCard.title = positions[0].title;

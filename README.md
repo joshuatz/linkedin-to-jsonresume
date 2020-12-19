@@ -73,6 +73,7 @@ When in doubt, refresh the profile page before using this tool.
 ## Updates:
 Date | Release | Notes
 --- | --- | ---
+12/19/2020 | 2.1.1 | Fix: Ordering of work history with new API endpoint ([#38](https://github.com/joshuatz/linkedin-to-jsonresume/issues/38))
 12/7/2020 | 2.1.0 | Fix: Issue with multilingual profile, when exporting your own profile with a different locale than your profile's default. ([#37](https://github.com/joshuatz/linkedin-to-jsonresume/pull/37))
 11/12/2020 | 2.0.0 | Support for multiple schema versions ✨ ([#34](https://github.com/joshuatz/linkedin-to-jsonresume/pull/34))
 11/8/2020 | 1.5.1 | Fix: Omit partial BDAY export in vCard ([#32](https://github.com/joshuatz/linkedin-to-jsonresume/issues/32))
@@ -135,6 +136,16 @@ li2jr.parseAndShowOutput();
 > Even if you have the repo inside of a local static server, you can't inject it via a script tag or fetch & eval, due to LI's restrictive CSP.
 
 If you do want to find the actual injected code of the extension in Chrome dev tools, you should be able to find it under `Sources -> Content Scripts -> top -> JSON Resume Exporter -> {main.js}`
+
+#### Debugging Snippets
+Helpful snippets (subject to change; these rely heavily on internals):
+
+```js
+// Get main profileDB (after running extension)
+var profileRes = await li2JrInstance.getParsedProfile();
+var profileDb = await li2JrInstance.internals.buildDbFromLiSchema(profileRes.liResponse);
+
+```
 
 ---
 

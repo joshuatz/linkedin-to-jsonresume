@@ -68,6 +68,14 @@ You can also unpack the ZIP and load it as "unpacked".
 ## Troubleshooting
 When in doubt, refresh the profile page before using this tool.
 
+### Troubleshooting - Debug Log
+If I'm trying to assist you in solving an issue with this tool, I might have you share some debug info. Currently, the easiest way to do this is to use the Chrome developer's console:
+
+1. Append `?li2jr_debug=true` to the end of the URL of the profile you are on
+2. Open Chrome dev tools, and specifically, the console ([instructions](https://developers.google.com/web/tools/chrome-devtools/open#console))
+3. Run the extension (try to export the profile), and then look for red messages that show up in the console (these are errors, as opposed to warnings or info logs).
+    - You can filter to just `error` messages, in the filter dropdown above the console.
+
 ---
 
 ## Updates:

@@ -54,9 +54,20 @@ export const liTypeMappings = {
     },
     // Individual work entries (not aggregate (workgroup) with date range)
     workPositions: {
-        tocKeys: ['*positionView', '*profilePositionGroups'],
+        tocKeys: ['*positionView'],
         types: ['com.linkedin.voyager.identity.profile.Position', 'com.linkedin.voyager.dash.identity.profile.Position'],
         recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePosition']
+    },
+    // Work entry *groups*, aggregated by employer clumping
+    workPositionGroups: {
+        tocKeys: ['*positionGroupView', '*profilePositionGroups'],
+        types: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroupsInjection'],
+        recipes: [
+            'com.linkedin.voyager.identity.profile.PositionGroupView',
+            'com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup',
+            // Generic collection response
+            'com.linkedin.restli.common.CollectionResponse'
+        ]
     },
     skills: {
         tocKeys: ['*skillView', '*profileSkills'],

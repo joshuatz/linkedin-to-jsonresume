@@ -89,8 +89,9 @@ declare global {
         getElementByUrn: (urn: string) => LiEntity | undefined;
         /**
          * Get multiple elements by URNs
+         *  - Allows passing a single URN, for convenience if unsure if you have an array
          */
-        getElementsByUrns: (urns: string[]) => LiEntity[];
+        getElementsByUrns: (urns: string[] | string) => LiEntity[];
     }
 
     interface LiProfileContactInfoResponse extends LiResponse {

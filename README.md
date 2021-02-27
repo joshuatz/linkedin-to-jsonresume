@@ -79,8 +79,12 @@ If I'm trying to assist you in solving an issue with this tool, I might have you
 ---
 
 ## Updates:
+<details>
+    <summary>Update History (Click to Show / Hide)</summary>
+
 Date | Release | Notes
 --- | --- | ---
+2/27/2021 | 2.1.2 | Fix: Multiple issues around work history / experience; missing titles, ordering, etc. Overhauled approach to extracting work entries.
 12/19/2020 | 2.1.1 | Fix: Ordering of work history with new API endpoint ([#38](https://github.com/joshuatz/linkedin-to-jsonresume/issues/38))
 12/7/2020 | 2.1.0 | Fix: Issue with multilingual profile, when exporting your own profile with a different locale than your profile's default. ([#37](https://github.com/joshuatz/linkedin-to-jsonresume/pull/37))
 11/12/2020 | 2.0.0 | Support for multiple schema versions ✨ ([#34](https://github.com/joshuatz/linkedin-to-jsonresume/pull/34))
@@ -102,6 +106,7 @@ Date | Release | Notes
 8/3/2019 | NA | Rewrote this tool as a browser extension instead of a bookmarklet to get around the CSP issue. Seems to work great!
 7/22/2019 | NA | ***ALERT***: This bookmarklet is currently broken, thanks to LinkedIn adding a new restrictive CSP (Content Security Policy) header to the site. [I've opened an issue](https://github.com/joshuatz/linkedin-to-jsonresume-bookmarklet/issues/1) to discuss this, and both short-term (requires using the console) and long-term (browser extension) solutions.
 6/21/2019 | 0.0.3 | I saw the bookmarklet was broken depending on how you came to the profile page, so I refactored a bunch of code and found a much better way to pull the data. Should be much more reliable!
+</details>
 
 ---
 
@@ -150,9 +155,8 @@ Helpful snippets (subject to change; these rely heavily on internals):
 
 ```js
 // Get main profileDB (after running extension)
-var profileRes = await li2JrInstance.getParsedProfile();
-var profileDb = await li2JrInstance.internals.buildDbFromLiSchema(profileRes.liResponse);
-
+var profileRes = await liToJrInstance.getParsedProfile(true);
+var profileDb = await liToJrInstance.internals.buildDbFromLiSchema(profileRes.liResponse);
 ```
 
 ---

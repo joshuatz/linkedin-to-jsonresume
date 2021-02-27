@@ -132,7 +132,10 @@ window.LinkedinToResumeJson = (() => {
             return db.entitiesByUrn[urn];
         };
         db.getElementsByUrns = function getElementsByUrns(urns) {
-            return urns.map((urn) => db.entitiesByUrn[urn]);
+            if (typeof urns === 'string') {
+                urns = [urns];
+            }
+            return Array.isArray(urns) ? urns.map((urn) => db.entitiesByUrn[urn]) : [];
         };
         // Only meant for 1:1 lookups; will return first match, if more than one
         // key provided. Usually returns a "view" (kind of a collection)
@@ -310,6 +313,7 @@ window.LinkedinToResumeJson = (() => {
         _outputJsonStable.work.push(parsedWork);
         _outputJsonLatest.work.push({
             name: parsedWork.company,
+            position: parsedWork.position,
             // This is description of company, not position
             // description: '',
             startDate: parsedWork.startDate,
@@ -500,14 +504,13 @@ window.LinkedinToResumeJson = (() => {
             // Parse work
             // First, check paging data
             let allWorkCanBeCaptured = true;
-            const positionView = db.getValueByKey(_liTypeMappings.workPositions.tocKeys);
+            const positionView = db.getValueByKey([..._liTypeMappings.workPositionGroups.tocKeys, ..._liTypeMappings.workPositions.tocKeys]);
             if (positionView.paging) {
                 const { paging } = positionView;
                 allWorkCanBeCaptured = paging.start + paging.count >= paging.total;
             }
             if (allWorkCanBeCaptured) {
-                const workPositions = db.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
-                workPositions.forEach((position) => {
+                _this.getWorkPositions(db).forEach((position) => {
                     parseAndPushPosition(position, db);
                 });
                 _this.debugConsole.log(`All work positions captured directly from profile result.`);
@@ -970,28 +973,75 @@ window.LinkedinToResumeJson = (() => {
         return false;
     };
 
+    /**
+     * Extract work positions via traversal through position groups
+     *  - LI groups "positions" by "positionGroups" - e.g. if you had three positions at the same company, with no breaks in-between to work at another company, those three positions are grouped under a single positionGroup
+     *  - LI also uses positionGroups to preserve order, whereas a direct lookup by type or recipe might not return ordered results
+     *  - This method will try to return ordered results first, and then fall back to any matching positition entities if it can't find an ordered lookup path
+     * @param {InternalDb} db
+     */
+    LinkedinToResumeJson.prototype.getWorkPositions = function getWorkPositions(db) {
+        const rootElements = db.getElements() || [];
+        /** @type {LiEntity[]} */
+        let positions = [];
+
+        /**
+         * There are multiple ways that work positions can be nested within a profileView, or other data structure
+         *  A) **ROOT** -> *profilePositionGroups -> PositionGroup[] -> *profilePositionInPositionGroup (COLLECTION) -> Position[]
+         *  B) **ROOT** -> *positionGroupView -> PositionGroupView -> PositionGroup[] -> *positions -> Position[]
+         */
+
+        // This is route A - longest recursion chain
+        // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
+        // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
+        // You can bypass by looking up by `Position` type, but then original ordering is not preserved
+        let profilePositionGroups = db.getValuesByKey('*profilePositionGroups');
+        // Check for voyager profilePositionGroups response, where all groups are direct children of root element
+        if (!profilePositionGroups.length && rootElements.length && rootElements[0].$type === 'com.linkedin.voyager.dash.identity.profile.PositionGroup') {
+            profilePositionGroups = rootElements;
+        }
+        profilePositionGroups.forEach((pGroup) => {
+            // This element (profilePositionGroup) is one way how LI groups positions
+            // - Instead of storing *elements (positions) directly,
+            // there is a pointer to a "collection" that has to be followed
+            /** @type {string | string[] | undefined} */
+            let profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
+            if (profilePositionInGroupCollectionUrns) {
+                const positionCollections = db.getElementsByUrns(profilePositionInGroupCollectionUrns);
+                // Another level... traverse collections
+                positionCollections.forEach((collection) => {
+                    // Final lookup via standard collection['*elements']
+                    positions = positions.concat(db.getElementsByUrns(collection['*elements'] || []));
+                });
+            }
+        });
+
+        if (!positions.length) {
+            db.getValuesByKey('*positionGroupView').forEach((pGroup) => {
+                positions = positions.concat(db.getElementsByUrns(pGroup['*positions'] || []));
+            });
+        }
+
+        if (!positions.length) {
+            // Direct lookup - by main TOC keys
+            positions = db.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
+        }
+
+        if (!positions.length) {
+            // Direct lookup - by type
+            positions = db.getElementsByType(_liTypeMappings.workPositions.types);
+        }
+
+        return positions;
+    };
+
     LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {
         try {
             const workResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profilePositionGroups);
             workResponses.forEach((response) => {
                 const db = buildDbFromLiSchema(response);
-                // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
-                // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
-                // You can bypass by looking up by `Position` type, but then original ordering is not preserved
-                db.getElements().forEach((positionGroup) => {
-                    // This element is how LI groups positions
-                    // - E.g. promotions within same company are all grouped
-                    // - Instead of storing *elements (positions) directly,
-                    // there is a pointer to a "collection" that has to be followed
-                    // - This multi-level traversal within the LI response could
-                    // probably be refactored into a `db.*` method.
-                    const collectionResponse = db.getElementByUrn(positionGroup['*profilePositionInPositionGroup']);
-                    if (collectionResponse && Array.isArray(collectionResponse['*elements'])) {
-                        db.getElementsByUrns(collectionResponse['*elements']).forEach((position) => {
-                            // This is *finally* the "Position" element
-                            parseAndPushPosition(position, db);
-                        });
-                    }
+                this.getWorkPositions(db).forEach((position) => {
+                    parseAndPushPosition(position, db);
                 });
             });
         } catch (e) {
@@ -1575,7 +1625,7 @@ window.LinkedinToResumeJson = (() => {
             }
         }
         // Try to get currently employed organization
-        const positions = profileDb.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
+        const positions = this.getWorkPositions(profileDb);
         if (positions.length) {
             vCard.organization = positions[0].companyName;
             vCard.title = positions[0].title;

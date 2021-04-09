@@ -134,7 +134,8 @@ declare global {
             skills: CaptureResult,
             projects: CaptureResult,
             awards: CaptureResult,
-            publications: CaptureResult
+            publications: CaptureResult,
+            languages: CaptureResult
         }
     }
 

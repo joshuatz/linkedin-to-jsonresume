@@ -352,7 +352,8 @@ window.LinkedinToResumeJson = (() => {
                 skills: 'fail',
                 projects: 'fail',
                 awards: 'fail',
-                publications: 'fail'
+                publications: 'fail',
+                languages: 'fail',
             }
         };
         if (_this.preferLocale) {
@@ -425,19 +426,7 @@ window.LinkedinToResumeJson = (() => {
                         ..._outputJsonLatest.basics,
                         ...formattedProfileObj
                     };
-                    /** @type {ResumeSchemaStable['languages'][0]} */
-                    const formatttedLang = {
-                        language: localeObject.language,
-                        fluency: 'Native Speaker'
-                    };
-                    _outputJsonStable.languages.push(formatttedLang);
-                    _outputJsonLatest.languages.push(formatttedLang);
                     resultSummary.sections.basics = 'success';
-
-                    // Also make sure instance defaultLocale is correct, while we are parsing profile
-                    const parsedLocaleStr = `${localeObject.language}_${localeObject.country}`;
-                    _defaultLocale = parsedLocaleStr;
-                    resultSummary.localeStr = parsedLocaleStr;
                 }
             });
 
@@ -642,6 +631,18 @@ window.LinkedinToResumeJson = (() => {
                 });
             });
             resultSummary.sections.publications = publicationEntries.length ? 'success' : 'empty';
+
+            // Parse languages
+            const languagesEntries = db.getValuesByKey(_liTypeMappings.languages.tocKeys);
+            languagesEntries.forEach((language) => {
+                /** @type {ResumeSchemaStable['languages'][0]} */
+                const parsedLanguage = {
+                    name: language.name
+                };
+                _outputJsonStable.languages.push(parsedLanguage);
+                _outputJsonLatest.languages.push(parsedLanguage);
+            });
+            resultSummary.sections.languages = languagesEntries.length ? 'success' : 'empty';
 
             if (_this.debug) {
                 console.group(`parseProfileSchemaJSON complete: ${document.location.pathname}`);

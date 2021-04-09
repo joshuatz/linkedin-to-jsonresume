@@ -12,7 +12,8 @@ export const liSchemaKeys = {
     attachments: '*summaryTreasuryMedias',
     volunteerWork: '*volunteerExperienceView',
     awards: '*honorView',
-    publications: '*publicationView'
+    publications: '*publicationView',
+    languages: '*languagesView'
 };
 /**
  * Try to maintain a mapping between generic section types, and LI's schema
@@ -98,5 +99,10 @@ export const liTypeMappings = {
         tocKeys: ['*publicationView', '*profilePublications'],
         types: ['com.linkedin.voyager.identity.profile.Publication', 'com.linkedin.voyager.dash.identity.profile.Publication'],
         recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfilePublication']
+    },
+    languages: {
+        tocKeys: ['*languageView', '*profileLanguages'],
+        types: ['com.linkedin.voyager.identity.profile.Language', 'com.linkedin.voyager.dash.identity.profile.Language'],
+        recipe: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileLanguage']
     }
 };

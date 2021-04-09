@@ -137,13 +137,9 @@ export interface Interest {
 
 export interface Language {
     /**
-     * e.g. Fluent, Beginner
-     */
-    fluency?: string;
-    /**
      * e.g. English, Spanish
      */
-    language?: string;
+    name?: string;
 }
 
 export interface Publication {

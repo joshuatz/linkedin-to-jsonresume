@@ -287,10 +287,10 @@ window.LinkedinToResumeJson = (() => {
             institution: noNullOrUndef(edu.schoolName),
             area: noNullOrUndef(edu.fieldOfStudy),
             studyType: noNullOrUndef(edu.degreeName),
-            startDate: '',
-            endDate: '',
+            startDate: parsedEdu.startDate,
+            endDate: parsedEdu.endDate,
             score: noNullOrUndef(edu.grade),
-            courses: []
+            courses: parsedEdu.courses
         });
     }
 

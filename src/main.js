@@ -283,7 +283,15 @@ window.LinkedinToResumeJson = (() => {
         // Push to final json
         _outputJsonStable.education.push(parsedEdu);
         // Currently, same schema can be re-used; only difference is URL, which I'm not including
-        _outputJsonLatest.education.push(parsedEdu);
+        _outputJsonLatest.education.push({
+            institution: noNullOrUndef(edu.schoolName),
+            area: noNullOrUndef(edu.fieldOfStudy),
+            studyType: noNullOrUndef(edu.degreeName),
+            startDate: '',
+            endDate: '',
+            score: noNullOrUndef(edu.grade),
+            courses: []
+        });
     }
 
     /**
@@ -544,18 +552,12 @@ window.LinkedinToResumeJson = (() => {
             });
             resultSummary.sections.volunteer = volunteerEntries.length ? 'success' : 'empty';
 
-            /**
-             * Parse certificates
-             *  - NOTE: This is not currently supported by the official (stable / latest) JSON Resume spec,
-             *  - Restricted to 'beta' template
-             * @see https://github.com/jsonresume/resume-schema/pull/340
-             */
             /** @type {ResumeSchemaBeyondSpec['certificates']} */
             const certificates = [];
             db.getValuesByKey(_liTypeMappings.certificates.tocKeys).forEach((cert) => {
                 /** @type {ResumeSchemaBeyondSpec['certificates'][0]} */
                 const certObj = {
-                    title: cert.name,
+                    name: cert.name,
                     issuer: cert.authority
                 };
                 parseAndAttachResumeDates(certObj, cert);

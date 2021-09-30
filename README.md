@@ -1,10 +1,12 @@
-# LinkedIn Profile to JSON Resume Browser Tool ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/joshuatz/linkedin-to-jsonresume)
+# Customized LinkedIn Profile to JSON Resume Browser Tool
+
+🖼️ This is a slightly tweaked version of the [LinkedIn to JSON Resume Chrome Extension](https://github.com/joshuatz/linkedin-to-jsonresume). That project is outdated because it isn't using the latest version of [JSON Schema](https://github.com/jsonresume/resume-schema). Furthermore, I have customized that schema myself, so I have to base this Chrome extension off of [my own schema](https://github.com/anthonyjdella/customized-resume-schema).
+
+---
 
 > An extremely easy-to-use browser extension for exporting your full LinkedIn Profile to a JSON Resume file or string.
 
-## Chrome Extension 📦 - [Webstore Link](https://chrome.google.com/webstore/detail/json-resume-exporter/caobgmmcpklomkcckaenhjlokpmfbdec)
 
-## My LinkedIn Profile 👨‍💼 - [linkedin.com/in/joshuatzucker/](https://www.linkedin.com/in/joshuatzucker/)
 
 ![Demo GIF](demo-chrome_extension.gif "Demo Gif")
 

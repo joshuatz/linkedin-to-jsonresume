@@ -1,5 +1,5 @@
-/** @type {Required<ResumeSchemaStable>} */
-export const resumeJsonTemplateStable = {
+/** @type {Required<ResumeSchemaLegacy>} */
+export const resumeJsonTemplateLegacy = {
     basics: {
         name: '',
         label: '',
@@ -28,8 +28,8 @@ export const resumeJsonTemplateStable = {
     references: []
 };
 
-/** @type {Required<ResumeSchemaLatest>} */
-export const resumeJsonTemplateLatest = {
+/** @type {Required<ResumeSchemaStable>} */
+export const resumeJsonTemplateStable = {
     $schema: 'https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json',
     basics: {
         name: '',
@@ -67,8 +67,7 @@ export const resumeJsonTemplateLatest = {
 
 /**
  * Beta can be combined with latest, so this is a partial (diff)
+ * Currently even with 1.0
  * @type {Partial<ResumeSchemaBeyondSpec>}
  */
-export const resumeJsonTemplateBetaPartial = {
-    certificates: []
-};
+export const resumeJsonTemplateBetaPartial = {};

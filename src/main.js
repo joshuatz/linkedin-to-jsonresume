@@ -6,7 +6,7 @@
  */
 
 import VCardsJS from '@dan/vcards';
-import { resumeJsonTemplateLatest, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } from './templates';
+import { resumeJsonTemplateLegacy, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } from './templates';
 import { liSchemaKeys as _liSchemaKeys, liTypeMappings as _liTypeMappings } from './schema';
 import {
     getCookie,
@@ -30,10 +30,10 @@ import {
 // @ts-ignore
 window.LinkedinToResumeJson = (() => {
     // private
+    /** @type {ResumeSchemaLegacy} */
+    let _outputJsonLegacy = JSON.parse(JSON.stringify(resumeJsonTemplateLegacy));
     /** @type {ResumeSchemaStable} */
     let _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
-    /** @type {ResumeSchemaLatest} */
-    let _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
     /** @type {ResumeSchemaBeyondSpec} */
     let _outputJsonBetaPartial = JSON.parse(JSON.stringify(resumeJsonTemplateBetaPartial));
     /** @type {string[]} */
@@ -224,17 +224,17 @@ window.LinkedinToResumeJson = (() => {
      */
     function pushSkill(skillName) {
         // Try to prevent duplicate skills
-        // Both stable and latest use same spec
-        const skillNames = _outputJsonStable.skills.map((skill) => skill.name);
+        // Both legacy and stable use same spec
+        const skillNames = _outputJsonLegacy.skills.map((skill) => skill.name);
         if (skillNames.indexOf(skillName) === -1) {
-            /** @type {ResumeSchemaStable['skills'][0]} */
+            /** @type {ResumeSchemaLegacy['skills'][0]} */
             const formattedSkill = {
                 name: skillName,
                 level: '',
                 keywords: []
             };
+            _outputJsonLegacy.skills.push(formattedSkill);
             _outputJsonStable.skills.push(formattedSkill);
-            _outputJsonLatest.skills.push(formattedSkill);
         }
     }
 
@@ -247,7 +247,7 @@ window.LinkedinToResumeJson = (() => {
     function parseAndPushEducation(educationObj, db, instance) {
         const _this = instance;
         const edu = educationObj;
-        /** @type {ResumeSchemaStable['education'][0]} */
+        /** @type {ResumeSchemaLegacy['education'][0]} */
         const parsedEdu = {
             institution: noNullOrUndef(edu.schoolName),
             area: noNullOrUndef(edu.fieldOfStudy),
@@ -281,9 +281,9 @@ window.LinkedinToResumeJson = (() => {
             });
         }
         // Push to final json
-        _outputJsonStable.education.push(parsedEdu);
+        _outputJsonLegacy.education.push(parsedEdu);
         // Currently, same schema can be re-used; only difference is URL, which I'm not including
-        _outputJsonLatest.education.push({
+        _outputJsonStable.education.push({
             institution: noNullOrUndef(edu.schoolName),
             area: noNullOrUndef(edu.fieldOfStudy),
             studyType: noNullOrUndef(edu.degreeName),
@@ -300,7 +300,7 @@ window.LinkedinToResumeJson = (() => {
      * @param {InternalDb} db
      */
     function parseAndPushPosition(positionObj, db) {
-        /** @type {ResumeSchemaStable['work'][0]} */
+        /** @type {ResumeSchemaLegacy['work'][0]} */
         const parsedWork = {
             company: positionObj.companyName,
             endDate: '',
@@ -318,8 +318,8 @@ window.LinkedinToResumeJson = (() => {
         }
 
         // Push to final json
-        _outputJsonStable.work.push(parsedWork);
-        _outputJsonLatest.work.push({
+        _outputJsonLegacy.work.push(parsedWork);
+        _outputJsonStable.work.push({
             name: parsedWork.company,
             position: parsedWork.position,
             // This is description of company, not position
@@ -411,7 +411,7 @@ window.LinkedinToResumeJson = (() => {
                      * @type {LiSupportedLocale}
                      */
                     const localeObject = !dash ? profile.defaultLocale : profile.primaryLocale;
-                    /** @type {ResumeSchemaStable['basics']} */
+                    /** @type {ResumeSchemaLegacy['basics']} */
                     const formattedProfileObj = {
                         name: `${profile.firstName} ${profile.lastName}`,
                         summary: noNullOrUndef(profile.summary),
@@ -425,21 +425,21 @@ window.LinkedinToResumeJson = (() => {
                     } else if (profile.locationName) {
                         formattedProfileObj.location.address = noNullOrUndef(profile.locationName);
                     }
+                    _outputJsonLegacy.basics = {
+                        ..._outputJsonLegacy.basics,
+                        ...formattedProfileObj
+                    };
                     _outputJsonStable.basics = {
                         ..._outputJsonStable.basics,
                         ...formattedProfileObj
                     };
-                    _outputJsonLatest.basics = {
-                        ..._outputJsonLatest.basics,
-                        ...formattedProfileObj
-                    };
-                    /** @type {ResumeSchemaStable['languages'][0]} */
+                    /** @type {ResumeSchemaLegacy['languages'][0]} */
                     const formatttedLang = {
                         language: localeObject.language,
                         fluency: 'Native Speaker'
                     };
+                    _outputJsonLegacy.languages.push(formatttedLang);
                     _outputJsonStable.languages.push(formatttedLang);
-                    _outputJsonLatest.languages.push(formatttedLang);
                     resultSummary.sections.basics = 'success';
 
                     // Also make sure instance defaultLocale is correct, while we are parsing profile
@@ -464,21 +464,21 @@ window.LinkedinToResumeJson = (() => {
                             username: usernameMatch[1],
                             url
                         };
+                        _outputJsonLegacy.basics.profiles.push(formattedProfile);
                         _outputJsonStable.basics.profiles.push(formattedProfile);
-                        _outputJsonLatest.basics.profiles.push(formattedProfile);
                     }
                 }
                 // Since most people put potfolio as first link, guess that it will be
                 if (!captured && !foundPortfolio) {
                     captured = true;
-                    _outputJsonStable.basics.website = url;
-                    _outputJsonLatest.basics.url = url;
+                    _outputJsonLegacy.basics.website = url;
+                    _outputJsonStable.basics.url = url;
                 }
                 // Finally, put in projects if not yet categorized
                 if (!captured) {
                     captured = true;
-                    _outputJsonLatest.projects = _outputJsonLatest.projects || [];
-                    _outputJsonLatest.projects.push({
+                    _outputJsonStable.projects = _outputJsonStable.projects || [];
+                    _outputJsonStable.projects.push({
                         name: attachment.title || attachment.mediaTitle,
                         startDate: '',
                         endDate: '',
@@ -531,7 +531,7 @@ window.LinkedinToResumeJson = (() => {
             // Parse volunteer experience
             const volunteerEntries = db.getValuesByKey(_liTypeMappings.volunteerWork.tocKeys);
             volunteerEntries.forEach((volunteering) => {
-                /** @type {ResumeSchemaStable['volunteer'][0]} */
+                /** @type {ResumeSchemaLegacy['volunteer'][0]} */
                 const parsedVolunteerWork = {
                     organization: volunteering.companyName,
                     position: volunteering.role,
@@ -544,8 +544,8 @@ window.LinkedinToResumeJson = (() => {
                 parseAndAttachResumeDates(parsedVolunteerWork, volunteering);
 
                 // Push to final json
-                _outputJsonStable.volunteer.push(parsedVolunteerWork);
-                _outputJsonLatest.volunteer.push({
+                _outputJsonLegacy.volunteer.push(parsedVolunteerWork);
+                _outputJsonStable.volunteer.push({
                     ...lazyCopy(parsedVolunteerWork, ['website']),
                     url: parsedVolunteerWork.website
                 });
@@ -588,7 +588,7 @@ window.LinkedinToResumeJson = (() => {
             resultSummary.sections.skills = skillArr.length ? 'success' : 'empty';
 
             // Parse projects
-            _outputJsonLatest.projects = _outputJsonLatest.projects || [];
+            _outputJsonStable.projects = _outputJsonStable.projects || [];
             db.getValuesByKey(_liTypeMappings.projects.tocKeys).forEach((project) => {
                 const parsedProject = {
                     name: project.title,
@@ -597,14 +597,14 @@ window.LinkedinToResumeJson = (() => {
                     url: project.url
                 };
                 parseAndAttachResumeDates(parsedProject, project);
-                _outputJsonLatest.projects.push(parsedProject);
+                _outputJsonStable.projects.push(parsedProject);
             });
-            resultSummary.sections.projects = _outputJsonLatest.projects.length ? 'success' : 'empty';
+            resultSummary.sections.projects = _outputJsonStable.projects.length ? 'success' : 'empty';
 
             // Parse awards
             const awardEntries = db.getValuesByKey(_liTypeMappings.awards.tocKeys);
             awardEntries.forEach((award) => {
-                /** @type {ResumeSchemaStable['awards'][0]} */
+                /** @type {ResumeSchemaLegacy['awards'][0]} */
                 const parsedAward = {
                     title: award.title,
                     date: '',
@@ -616,15 +616,15 @@ window.LinkedinToResumeJson = (() => {
                 if (issueDateObject && typeof issueDateObject === 'object') {
                     parsedAward.date = parseDate(issueDateObject);
                 }
+                _outputJsonLegacy.awards.push(parsedAward);
                 _outputJsonStable.awards.push(parsedAward);
-                _outputJsonLatest.awards.push(parsedAward);
             });
             resultSummary.sections.awards = awardEntries.length ? 'success' : 'empty';
 
             // Parse publications
             const publicationEntries = db.getValuesByKey(_liTypeMappings.publications.tocKeys);
             publicationEntries.forEach((publication) => {
-                /** @type {ResumeSchemaStable['publications'][0]} */
+                /** @type {ResumeSchemaLegacy['publications'][0]} */
                 const parsedPublication = {
                     name: publication.name,
                     publisher: publication.publisher,
@@ -637,8 +637,8 @@ window.LinkedinToResumeJson = (() => {
                 if (publicationDateObj && typeof publicationDateObj === 'object' && typeof publicationDateObj.year !== 'undefined') {
                     parsedPublication.releaseDate = parseDate(publicationDateObj);
                 }
-                _outputJsonStable.publications.push(parsedPublication);
-                _outputJsonLatest.publications.push({
+                _outputJsonLegacy.publications.push(parsedPublication);
+                _outputJsonStable.publications.push({
                     ...lazyCopy(parsedPublication, ['website']),
                     url: parsedPublication.website
                 });
@@ -649,8 +649,8 @@ window.LinkedinToResumeJson = (() => {
                 console.group(`parseProfileSchemaJSON complete: ${document.location.pathname}`);
                 console.log({
                     db,
+                    _outputJsonLegacy,
                     _outputJsonStable,
-                    _outputJsonLatest,
                     resultSummary
                 });
                 console.groupEnd();
@@ -707,8 +707,8 @@ window.LinkedinToResumeJson = (() => {
                 _liTypeMappings,
                 _voyagerEndpoints,
                 output: {
+                    _outputJsonLegacy,
                     _outputJsonStable,
-                    _outputJsonLatest,
                     _outputJsonBetaPartial
                 }
             };
@@ -788,8 +788,8 @@ window.LinkedinToResumeJson = (() => {
             username: this.profileId,
             url: `https://www.linkedin.com/in/${this.profileId}/`
         };
+        _outputJsonLegacy.basics.profiles.push(formattedProfile);
         _outputJsonStable.basics.profiles.push(formattedProfile);
-        _outputJsonLatest.basics.profiles.push(formattedProfile);
     };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiFullProfile = async function parseViaInternalApiFullProfile(useCache = true) {
@@ -799,19 +799,19 @@ window.LinkedinToResumeJson = (() => {
 
             // Some sections might require additional fetches to fill missing data
             if (profileParserResult.sections.work === 'incomplete') {
+                _outputJsonLegacy.work = [];
                 _outputJsonStable.work = [];
-                _outputJsonLatest.work = [];
                 await this.parseViaInternalApiWork();
             }
             if (profileParserResult.sections.education === 'incomplete') {
+                _outputJsonLegacy.education = [];
                 _outputJsonStable.education = [];
-                _outputJsonLatest.education = [];
                 await this.parseViaInternalApiEducation();
             }
 
             this.debugConsole.log({
-                _outputJsonStable,
-                _outputJsonLatest
+                _outputJsonLegacy,
+                _outputJsonStable
             });
 
             return true;
@@ -846,21 +846,21 @@ window.LinkedinToResumeJson = (() => {
             const contactInfo = await this.voyagerFetch(_voyagerEndpoints.contactInfo);
             if (contactInfo && typeof contactInfo.data === 'object') {
                 const { websites, twitterHandles, phoneNumbers, emailAddress } = contactInfo.data;
-                /** @type {Partial<ResumeSchemaStable['basics']>} */
+                /** @type {Partial<ResumeSchemaLegacy['basics']>} */
                 const partialBasics = {
-                    location: _outputJsonStable.basics.location
+                    location: _outputJsonLegacy.basics.location
                 };
-                partialBasics.location.address = noNullOrUndef(contactInfo.data.address, _outputJsonStable.basics.location.address);
-                partialBasics.email = noNullOrUndef(emailAddress, _outputJsonStable.basics.email);
+                partialBasics.location.address = noNullOrUndef(contactInfo.data.address, _outputJsonLegacy.basics.location.address);
+                partialBasics.email = noNullOrUndef(emailAddress, _outputJsonLegacy.basics.email);
                 if (phoneNumbers && phoneNumbers.length) {
                     partialBasics.phone = noNullOrUndef(phoneNumbers[0].number);
                 }
-                _outputJsonStable.basics = {
-                    ..._outputJsonStable.basics,
+                _outputJsonLegacy.basics = {
+                    ..._outputJsonLegacy.basics,
                     ...partialBasics
                 };
-                _outputJsonLatest.basics = {
-                    ..._outputJsonLatest.basics,
+                _outputJsonStable.basics = {
+                    ..._outputJsonStable.basics,
                     ...partialBasics
                 };
 
@@ -868,8 +868,8 @@ window.LinkedinToResumeJson = (() => {
                 if (Array.isArray(websites)) {
                     for (let x = 0; x < websites.length; x++) {
                         if (/portfolio/i.test(websites[x].type.category)) {
-                            _outputJsonStable.basics.website = websites[x].url;
-                            _outputJsonLatest.basics.url = websites[x].url;
+                            _outputJsonLegacy.basics.website = websites[x].url;
+                            _outputJsonStable.basics.url = websites[x].url;
                         }
                     }
                 }
@@ -883,8 +883,8 @@ window.LinkedinToResumeJson = (() => {
                             username: handle,
                             url: `https://twitter.com/${handle}`
                         };
+                        _outputJsonLegacy.basics.profiles.push(formattedProfile);
                         _outputJsonStable.basics.profiles.push(formattedProfile);
-                        _outputJsonLatest.basics.profiles.push(formattedProfile);
                     });
                 }
                 return true;
@@ -901,18 +901,18 @@ window.LinkedinToResumeJson = (() => {
             if (basicAboutMe && typeof basicAboutMe.data === 'object') {
                 if (Array.isArray(basicAboutMe.included) && basicAboutMe.included.length > 0) {
                     const data = basicAboutMe.included[0];
-                    /** @type {Partial<ResumeSchemaStable['basics']>} */
+                    /** @type {Partial<ResumeSchemaLegacy['basics']>} */
                     const partialBasics = {
                         name: `${data.firstName} ${data.LastName}`,
                         // Note - LI labels this as "occupation", but it is basically the callout that shows up in search results and is in the header of the profile
                         label: data.occupation
                     };
-                    _outputJsonStable.basics = {
-                        ..._outputJsonStable.basics,
+                    _outputJsonLegacy.basics = {
+                        ..._outputJsonLegacy.basics,
                         ...partialBasics
                     };
-                    _outputJsonLatest.basics = {
-                        ..._outputJsonLatest.basics,
+                    _outputJsonStable.basics = {
+                        ..._outputJsonStable.basics,
                         ...partialBasics
                     };
                 }
@@ -929,18 +929,18 @@ window.LinkedinToResumeJson = (() => {
             const advancedAboutMe = await this.voyagerFetch(_voyagerEndpoints.advancedAboutMe);
             if (advancedAboutMe && typeof advancedAboutMe.data === 'object') {
                 const { data } = advancedAboutMe;
-                /** @type {Partial<ResumeSchemaStable['basics']>} */
+                /** @type {Partial<ResumeSchemaLegacy['basics']>} */
                 const partialBasics = {
                     name: `${data.firstName} ${data.lastName}`,
                     label: data.headline,
                     summary: data.summary
                 };
-                _outputJsonStable.basics = {
-                    ..._outputJsonStable.basics,
+                _outputJsonLegacy.basics = {
+                    ..._outputJsonLegacy.basics,
                     ...partialBasics
                 };
-                _outputJsonLatest.basics = {
-                    ..._outputJsonLatest.basics,
+                _outputJsonStable.basics = {
+                    ..._outputJsonStable.basics,
                     ...partialBasics
                 };
                 return true;
@@ -965,8 +965,8 @@ window.LinkedinToResumeJson = (() => {
                         name: `${recommenderElem.firstName} ${recommenderElem.lastName}`,
                         reference: elem.recommendationText
                     };
+                    _outputJsonLegacy.references.push(formattedReference);
                     _outputJsonStable.references.push(formattedReference);
-                    _outputJsonLatest.references.push(formattedReference);
                 }
             });
         } catch (e) {
@@ -1102,8 +1102,8 @@ window.LinkedinToResumeJson = (() => {
             }
 
             this.debugConsole.log({
+                _outputJsonLegacy,
                 _outputJsonStable,
-                _outputJsonLatest,
                 _outputJsonBetaPartial
             });
             if (apiSuccessCount > 0) {
@@ -1257,8 +1257,8 @@ window.LinkedinToResumeJson = (() => {
                 }
             } else {
                 // Reset output to empty template
+                _outputJsonLegacy = JSON.parse(JSON.stringify(resumeJsonTemplateLegacy));
                 _outputJsonStable = JSON.parse(JSON.stringify(resumeJsonTemplateStable));
-                _outputJsonLatest = JSON.parse(JSON.stringify(resumeJsonTemplateLatest));
                 _outputJsonBetaPartial = JSON.parse(JSON.stringify(resumeJsonTemplateBetaPartial));
 
                 // Trigger full load
@@ -1289,8 +1289,8 @@ window.LinkedinToResumeJson = (() => {
     /** @param {SchemaVersion} version */
     LinkedinToResumeJson.prototype.parseAndGetRawJson = async function parseAndGetRawJson(version = 'stable') {
         await this.tryParse();
-        let rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLatest;
-        // If beta, combine with latest
+        let rawJson = version === 'stable' ? _outputJsonStable : _outputJsonLegacy;
+        // If beta, combine with stable
         if (version === 'beta') {
             rawJson = {
                 ...rawJson,
@@ -1303,7 +1303,7 @@ window.LinkedinToResumeJson = (() => {
     /** @param {SchemaVersion} version */
     LinkedinToResumeJson.prototype.parseAndDownload = async function parseAndDownload(version = 'stable') {
         const rawJson = await this.parseAndGetRawJson(version);
-        const fileName = `${_outputJsonStable.basics.name.replace(/\s/g, '_')}.resume.json`;
+        const fileName = `${_outputJsonLegacy.basics.name.replace(/\s/g, '_')}.resume.json`;
         const fileContents = JSON.stringify(rawJson, null, 2);
         this.debugConsole.log(fileContents);
         promptDownload(fileContents, fileName, 'application/json');

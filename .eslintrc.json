@@ -1,6 +1,10 @@
 {
-  "extends": ["airbnb-base","plugin:prettier/recommended"],
-  "ignorePatterns": ["**/build/**/*", "**/scratch**/*"],
+  "extends": ["airbnb-base","plugin:prettier/recommended", "plugin:@typescript-eslint/recommended", "plugin:import/errors", "plugin:import/warnings", "plugin:import/typescript"],
+  "ignorePatterns": ["**/build*/**", "**/webstore-zips/**", "**/scratch**"],
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": 2018
   },
@@ -29,9 +33,29 @@
     "prefer-destructuring": ["error", {
       "array": false,
       "object": true
-    }]
+    }],
+    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/no-this-alias": "off",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/ban-ts-comment": "off",
+    "@typescript-eslint/no-empty-interface": "off",
+    "import/extensions": [
+      "error",
+      "ignorePackages",
+      {
+        "js": "never",
+        "jsx": "never",
+        "ts": "never",
+        "tsx": "never"
+      }
+   ]
   },
   "globals": {
     "chrome": "readonly"
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": {}
+    }
   }
 }

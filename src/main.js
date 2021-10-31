@@ -1007,7 +1007,7 @@ window.LinkedinToResumeJson = (() => {
             // - Instead of storing *elements (positions) directly,
             // there is a pointer to a "collection" that has to be followed
             /** @type {string | string[] | undefined} */
-            let profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
+            const profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
             if (profilePositionInGroupCollectionUrns) {
                 const positionCollections = db.getElementsByUrns(profilePositionInGroupCollectionUrns);
                 // Another level... traverse collections

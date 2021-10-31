@@ -6,19 +6,10 @@
  */
 
 // All of these imports are because the spec is the same for the sub-section in both stable and latest (this doc)
-import {Iso8601, Award, Location, Profile, Interest, Language, Reference, Skill, ResumeSchemaLegacy} from './jsonresume.schema.legacy';
+import { Iso8601, Award, Location, Profile, Interest, Language, Reference, Skill, ResumeSchemaLegacy } from './jsonresume.schema.legacy.js';
 
 // Re-export
-export {
-    Iso8601,
-    Award,
-    Location,
-    Profile,
-    Interest,
-    Language,
-    Reference,
-    Skill
-}
+export { Iso8601, Award, Location, Profile, Interest, Language, Reference, Skill };
 
 export interface Certificate {
     /**
@@ -51,9 +42,9 @@ export interface Basics {
     /**
      * e.g. Web Developer
      */
-    label?:    string;
+    label?: string;
     location?: Location;
-    name?:     string;
+    name?: string;
     /**
      * Phone numbers are stored as strings so use any format you like, e.g. 712-117-2923
      */
@@ -90,7 +81,7 @@ export interface Education {
      * e.g. Massachusetts Institute of Technology
      */
     institution?: string;
-    startDate?:   Iso8601;
+    startDate?: Iso8601;
     /**
      * e.g. Bachelor
      */
@@ -124,7 +115,7 @@ export interface Project {
      * Short summary of project. e.g. Collated works of 2017.
      */
     description?: string;
-    endDate?:     Iso8601;
+    endDate?: Iso8601;
     /**
      * Specify the relevant company/entity affiliations e.g. 'greenpeace', 'corporationXYZ'
      */
@@ -144,7 +135,7 @@ export interface Project {
     /**
      * Specify your role on this project or in company
      */
-    roles?:     string[];
+    roles?: string[];
     startDate?: Iso8601;
     /**
      * e.g. 'volunteering', 'presentation', 'talk', 'application', 'conference'
@@ -161,21 +152,21 @@ export type Publication = Omit<ResumeSchemaLegacy['publications'][0], 'website'>
      * e.g. http://www.computer.org.example.com/csdl/mags/co/1996/10/rx069-abs.html
      */
     url?: string;
-}
+};
 
 export type Volunteer = Omit<ResumeSchemaLegacy['volunteer'][0], 'website'> & {
     /**
      * e.g. https://www.eff.org/
      */
     url?: string;
-}
+};
 
 export interface Work {
     /**
      * e.g. Social Media Company
      */
     description?: string;
-    endDate?:     Iso8601;
+    endDate?: Iso8601;
     /**
      * Specify multiple accomplishments
      */
@@ -191,7 +182,7 @@ export interface Work {
     /**
      * e.g. Software Engineer
      */
-    position?:  string;
+    position?: string;
     startDate?: Iso8601;
     /**
      * Give an overview of your responsibilities at the company
@@ -211,8 +202,8 @@ export interface ResumeSchemaStable {
     /**
      * Specify any awards you have received throughout your professional career
      */
-    awards?:    Award[];
-    basics?:    Basics;
+    awards?: Award[];
+    basics?: Basics;
     certificates: Certificate[];
     education?: Education[];
     interests?: Interest[];
@@ -239,9 +230,9 @@ export interface ResumeSchemaStable {
     /**
      * List out your professional skill-set
      */
-    skills?:    Skill[];
+    skills?: Skill[];
     volunteer?: Volunteer[];
-    work?:      Work[];
+    work?: Work[];
 }
 
 /**

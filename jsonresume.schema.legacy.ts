@@ -30,6 +30,39 @@ export interface Award {
     title?: string;
 }
 
+export interface Profile {
+    /**
+     * e.g. Facebook or Twitter
+     */
+    network?: string;
+    /**
+     * e.g. https://twitter.com/TwitterDev
+     */
+    url?: string;
+    /**
+     * e.g. TwitterDev
+     */
+    username?: string;
+}
+
+export interface Location {
+    /**
+     * To add multiple address lines, use \n
+     * For example, 1234 Glücklichkeit Straße\nHinterhaus 5. Etage li.
+     */
+    address?: string;
+    city?: string;
+    /**
+     * code as per ISO-3166-1 ALPHA-2, e.g. US, AU, IN
+     */
+    countryCode?: string;
+    postalCode?: string;
+    /**
+     * The general region where you live. Can be a US state, or a province, for instance.
+     */
+    region?: string;
+}
+
 export interface Basics {
     /**
      * e.g. thomas@gmail.com
@@ -38,9 +71,9 @@ export interface Basics {
     /**
      * e.g. Web Developer
      */
-    label?:    string;
+    label?: string;
     location?: Location;
-    name:     string;
+    name: string;
     /**
      * Phone numbers are stored as strings so use any format you like, e.g. 712-117-2923
      */
@@ -61,39 +94,6 @@ export interface Basics {
      * URL (as per RFC 3986) to your website, e.g. personal homepage
      */
     website?: string;
-}
-
-export interface Location {
-    /**
-     * To add multiple address lines, use \n
-     * For example, 1234 Glücklichkeit Straße\nHinterhaus 5. Etage li.
-     */
-    address?: string;
-    city?:    string;
-    /**
-     * code as per ISO-3166-1 ALPHA-2, e.g. US, AU, IN
-     */
-    countryCode?: string;
-    postalCode?:  string;
-    /**
-     * The general region where you live. Can be a US state, or a province, for instance.
-     */
-    region?: string;
-}
-
-export interface Profile {
-    /**
-     * e.g. Facebook or Twitter
-     */
-    network?: string;
-    /**
-     * e.g. https://twitter.com/TwitterDev
-     */
-    url?: string;
-    /**
-     * e.g. TwitterDev
-     */
-    username?: string;
 }
 
 export interface Education {
@@ -262,8 +262,8 @@ export interface ResumeSchemaLegacy {
     /**
      * Specify any awards you have received throughout your professional career
      */
-    awards?:    Award[];
-    basics?:    Basics;
+    awards?: Award[];
+    basics?: Basics;
     education?: Education[];
     interests?: Interest[];
     /**
@@ -281,7 +281,7 @@ export interface ResumeSchemaLegacy {
     /**
      * List out your professional skill-set
      */
-    skills?:    Skill[];
+    skills?: Skill[];
     volunteer?: Volunteer[];
-    work?:      Work[];
+    work?: Work[];
 }

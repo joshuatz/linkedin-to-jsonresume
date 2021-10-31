@@ -1,28 +1,14 @@
-import {ResumeSchemaLegacy as _ResumeSchemaLegacy} from './jsonresume.schema.legacy';
-import {ResumeSchemaStable as _ResumeSchemaStable, ResumeSchemaBeyondSpec as _ResumeSchemaBeyondSpec} from './jsonresume.schema.latest';
+import { ResumeSchemaLegacy as _ResumeSchemaLegacy } from './jsonresume.schema.legacy';
+import { ResumeSchemaStable as _ResumeSchemaStable, ResumeSchemaBeyondSpec as _ResumeSchemaBeyondSpec } from './jsonresume.schema.latest';
 
 declare global {
     interface GenObj {
         [k: string]: any;
     }
 
-    /**
-     * LI Types
-     */
+    // LI Types
 
     type LiUrn = string;
-
-    interface LiResponse {
-        data: {
-            $type: string;
-            paging?: LiPaging;
-            // This is kind of a ToC, where each string corresponds to an entityUrn ID of an entity in `included`
-            '*elements'?: string[];
-            // Any number of fields can be included, especially if this is a "flat" response (when `included` is empty, and all entity data is directly in `data`)
-            [k: string]: IGenObj | string;
-        } & Partial<LiEntity>;
-        included: LiEntity[];
-    }
 
     interface LiPaging {
         count: number;
@@ -40,6 +26,18 @@ declare global {
         objectUrn?: LiUrn;
         [key: string]: any;
         paging?: LiPaging;
+    }
+
+    interface LiResponse {
+        data: {
+            $type: string;
+            paging?: LiPaging;
+            // This is kind of a ToC, where each string corresponds to an entityUrn ID of an entity in `included`
+            '*elements'?: string[];
+            // Any number of fields can be included, especially if this is a "flat" response (when `included` is empty, and all entity data is directly in `data`)
+            [k: string]: GenObj | string | boolean;
+        } & Partial<LiEntity>;
+        included: LiEntity[];
     }
 
     interface LiSupportedLocale {
@@ -67,7 +65,7 @@ declare global {
         type: {
             $type: string;
             category: string;
-        }
+        };
         $type: string;
     }
 
@@ -76,16 +74,15 @@ declare global {
     interface InternalDb {
         tableOfContents: LiResponse['data'];
         entitiesByUrn: {
-            [k: LiUrn]: LiEntity & {key: LiUrn}
-            [k: string]: LiEntity & {key: LiUrn};
-        }
-        entities: Array<LiEntity & {key: LiUrn}>;
+            [k: string]: LiEntity & { key: LiUrn };
+        };
+        entities: Array<LiEntity & { key: LiUrn }>;
         // Methods
         getElementKeys: () => string[];
-        getElements: () => Array<LiEntity & {key: LIUrn}>;
+        getElements: () => Array<LiEntity & { key: LiUrn }>;
         getValueByKey: (key: string | string[]) => LiEntity;
         getValuesByKey: (key: LiUrn | LiUrn[], optTocValModifier?: TocValModifier) => LiEntity[];
-        getElementsByType: (typeStr: string | string []) => LiEntity[];
+        getElementsByType: (typeStr: string | string[]) => LiEntity[];
         getElementByUrn: (urn: string) => LiEntity | undefined;
         /**
          * Get multiple elements by URNs
@@ -95,21 +92,22 @@ declare global {
     }
 
     interface LiProfileContactInfoResponse extends LiResponse {
-        data: LiResponse['data'] & Partial<LiEntity> & {
-            $type: 'com.linkedin.voyager.identity.profile.ProfileContactInfo';
-            address: string;
-            birthDateOn: LiDate;
-            birthdayVisibilitySetting: any;
-            connectedAt: null | number;
-            emailAddress: null | string;
-            ims: any;
-            interests: any;
-            phoneNumbers: null | LiPhoneNum[];
-            primaryTwitterHandle: null | string;
-            twitterHandles: any[];
-            weChatContactInfo: any;
-            websites: null | LiWebsite[];
-        }
+        data: LiResponse['data'] &
+            Partial<LiEntity> & {
+                $type: 'com.linkedin.voyager.identity.profile.ProfileContactInfo';
+                address: string;
+                birthDateOn: LiDate;
+                birthdayVisibilitySetting: any;
+                connectedAt: null | number;
+                emailAddress: null | string;
+                ims: any;
+                interests: any;
+                phoneNumbers: null | LiPhoneNum[];
+                primaryTwitterHandle: null | string;
+                twitterHandles: any[];
+                weChatContactInfo: any;
+                websites: null | LiWebsite[];
+            };
     }
 
     /**
@@ -125,17 +123,17 @@ declare global {
         localeStr?: string;
         parseSuccess: boolean;
         sections: {
-            basics: CaptureResult,
-            attachments: CaptureResult,
-            education: CaptureResult,
-            work: CaptureResult,
-            volunteer: CaptureResult,
-            certificates: CaptureResult,
-            skills: CaptureResult,
-            projects: CaptureResult,
-            awards: CaptureResult,
-            publications: CaptureResult
-        }
+            basics: CaptureResult;
+            attachments: CaptureResult;
+            education: CaptureResult;
+            work: CaptureResult;
+            volunteer: CaptureResult;
+            certificates: CaptureResult;
+            skills: CaptureResult;
+            projects: CaptureResult;
+            awards: CaptureResult;
+            publications: CaptureResult;
+        };
     }
 
     type SchemaVersion = 'legacy' | 'stable' | 'beta';

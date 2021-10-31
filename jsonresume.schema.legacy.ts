@@ -258,7 +258,7 @@ export interface Work {
     website?: string;
 }
 
-export interface ResumeSchemaStable {
+export interface ResumeSchemaLegacy {
     /**
      * Specify any awards you have received throughout your professional career
      */

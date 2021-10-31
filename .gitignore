@@ -7,3 +7,4 @@ webstore-zips
 scratch
 *.pem
 *.crx
+.DS_Store

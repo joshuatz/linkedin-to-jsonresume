@@ -1,12 +1,13 @@
 /**
- * @file Represents the latest version of the schema that I'm willing to support / implement
- *   - Currently locked to v0.1.3, @see https://github.com/joshuatz/linkedin-to-jsonresume/issues/33
- * @see https://github.com/jsonresume/resume-schema/blob/v0.1.3/schema.json
- *  - Permalink of above: https://github.com/jsonresume/resume-schema/blob/cb54b409edd8502ec7a1c196668911985dce8bdd/schema.json
+ * @file Represents the current version(s) of the schema
+ *   - Currently v1.0.0
+ * @see https://github.com/jsonresume/resume-schema/blob/v1.0.0/schema.json
+ *  - Permalink of above: https://github.com/jsonresume/resume-schema/blob/8a5b3982f8e5b9f8840398e162a6e0c418d023da/schema.json
  */
 
 // All of these imports are because the spec is the same for the sub-section in both stable and latest (this doc)
-import {Iso8601, Award, Location, Profile, Interest, Language, Reference, Skill, ResumeSchemaStable} from './jsonresume.schema.stable';
+import {Iso8601, Award, Location, Profile, Interest, Language, Reference, Skill, ResumeSchemaLegacy} from './jsonresume.schema.legacy';
+
 // Re-export
 export {
     Iso8601,
@@ -19,13 +20,11 @@ export {
     Skill
 }
 
-// Not yet in stable
-// https://github.com/jsonresume/resume-schema/pull/340
-interface Certificate {
+export interface Certificate {
     /**
      * e.g. Certified Kubernetes Administrator
      */
-    title: string;
+    name: string;
     /**
      * e.g. 1989-06-12
      */
@@ -86,7 +85,7 @@ export interface Education {
     /**
      * grade point average, e.g. 3.67/4.0
      */
-    gpa?: string;
+    score?: string;
     /**
      * e.g. Massachusetts Institute of Technology
      */
@@ -157,14 +156,14 @@ export interface Project {
     url?: string;
 }
 
-export type Publication = Omit<ResumeSchemaStable['publications'][0], 'website'> & {
+export type Publication = Omit<ResumeSchemaLegacy['publications'][0], 'website'> & {
     /**
      * e.g. http://www.computer.org.example.com/csdl/mags/co/1996/10/rx069-abs.html
      */
     url?: string;
 }
 
-export type Volunteer = Omit<ResumeSchemaStable['volunteer'][0], 'website'> & {
+export type Volunteer = Omit<ResumeSchemaLegacy['volunteer'][0], 'website'> & {
     /**
      * e.g. https://www.eff.org/
      */
@@ -204,7 +203,7 @@ export interface Work {
     url?: string;
 }
 
-export interface ResumeSchemaLatest {
+export interface ResumeSchemaStable {
     /**
      * link to the version of the schema that can validate the resume
      */
@@ -214,6 +213,7 @@ export interface ResumeSchemaLatest {
      */
     awards?:    Award[];
     basics?:    Basics;
+    certificates: Certificate[];
     education?: Education[];
     interests?: Interest[];
     /**
@@ -244,6 +244,7 @@ export interface ResumeSchemaLatest {
     work?:      Work[];
 }
 
-export interface ResumeSchemaBeyondSpec extends ResumeSchemaLatest {
-    certificates: Certificate[];
-}
+/**
+ * Currently even - nothing beyond v1
+ */
+export interface ResumeSchemaBeyondSpec extends ResumeSchemaStable {}

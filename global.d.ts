@@ -1,5 +1,5 @@
-import {ResumeSchemaStable as _ResumeSchemaStable} from './jsonresume.schema.stable';
-import {ResumeSchemaLatest as _ResumeSchemaLatest, ResumeSchemaBeyondSpec as _ResumeSchemaBeyondSpec} from './jsonresume.schema.latest';
+import {ResumeSchemaLegacy as _ResumeSchemaLegacy} from './jsonresume.schema.legacy';
+import {ResumeSchemaStable as _ResumeSchemaStable, ResumeSchemaBeyondSpec as _ResumeSchemaBeyondSpec} from './jsonresume.schema.latest';
 
 declare global {
     interface GenObj {
@@ -138,9 +138,9 @@ declare global {
         }
     }
 
-    type SchemaVersion = 'stable' | 'latest' | 'beta';
+    type SchemaVersion = 'legacy' | 'stable' | 'beta';
 
+    type ResumeSchemaLegacy = _ResumeSchemaLegacy;
     type ResumeSchemaStable = _ResumeSchemaStable;
-    type ResumeSchemaLatest = _ResumeSchemaLatest;
     type ResumeSchemaBeyondSpec = _ResumeSchemaBeyondSpec;
 }

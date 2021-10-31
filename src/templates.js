@@ -1,5 +1,5 @@
-/** @type {Required<ResumeSchemaStable>} */
-export const resumeJsonTemplateStable = {
+/** @type {Required<ResumeSchemaLegacy>} */
+export const resumeJsonTemplateLegacy = {
     basics: {
         name: '',
         label: '',
@@ -28,9 +28,9 @@ export const resumeJsonTemplateStable = {
     references: []
 };
 
-/** @type {Required<ResumeSchemaLatest>} */
-export const resumeJsonTemplateLatest = {
-    $schema: 'https://json.schemastore.org/resume',
+/** @type {Required<ResumeSchemaStable>} */
+export const resumeJsonTemplateStable = {
+    $schema: 'https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json',
     basics: {
         name: '',
         label: '',
@@ -52,6 +52,7 @@ export const resumeJsonTemplateLatest = {
     volunteer: [],
     education: [],
     awards: [],
+    certificates: [],
     publications: [],
     skills: [],
     languages: [],
@@ -59,15 +60,14 @@ export const resumeJsonTemplateLatest = {
     references: [],
     projects: [],
     meta: {
-        version: 'v0.1.3',
-        canonical: 'https://github.com/jsonresume/resume-schema/blob/v0.1.3/schema.json'
+        version: 'v1.0.0',
+        canonical: 'https://github.com/jsonresume/resume-schema/blob/v1.0.0/schema.json'
     }
 };
 
 /**
  * Beta can be combined with latest, so this is a partial (diff)
+ * Currently even with 1.0
  * @type {Partial<ResumeSchemaBeyondSpec>}
  */
-export const resumeJsonTemplateBetaPartial = {
-    certificates: []
-};
+export const resumeJsonTemplateBetaPartial = {};

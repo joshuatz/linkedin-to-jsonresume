@@ -11,7 +11,7 @@ const STORAGE_KEYS = {
 };
 const SPEC_SELECT = /** @type {HTMLSelectElement} */ (document.getElementById('specSelect'));
 /** @type {SchemaVersion[]} */
-const SPEC_OPTIONS = ['beta', 'stable', 'latest'];
+const SPEC_OPTIONS = ['legacy', 'stable', 'beta'];
 /** @type {HTMLSelectElement} */
 const LANG_SELECT = document.querySelector('.langSelect');
 

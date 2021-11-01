@@ -8,6 +8,25 @@
 
 ![Demo GIF](demo-chrome_extension.gif "Demo Gif")
 
+## Breaking Change - `v1.0` Schema Update
+The 10/31/2021 release of this extension (`v3.0.0`) changes the default shape of the JSON exported by this tool, to adhere to the newer `v1` schema offered by JSON Resume:
+
+<details>
+	<summary>Previously</summary>
+
+- Stable: `v0.0.16`
+- Latest: `v0.1.3`
+- Beta: `v0.1.3` + `certificates`
+</details>
+
+<details>
+	<summary>Version 3.0.0</summary>
+
+- ***Legacy***: `v0.0.16`
+- Stable: `v1.0.0`
+- Beta: Even with `v1.0.0` (for now)
+</details>
+
 ## Usage / Installation Options:
 There are (or *were*) a few different options for how to use this:
  - **Fast and simple**: Chrome Extension - [Get it here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
@@ -84,6 +103,7 @@ If I'm trying to assist you in solving an issue with this tool, I might have you
 
 Date | Release | Notes
 --- | --- | ---
+10/31/2021 | 3.0.0 | **Breaking Update**: This extension has now been updated to output JSON matching the `v1` schema specification released by JSON Resume (see [#53](https://github.com/joshuatz/linkedin-to-jsonresume/pull/53) and [#56](https://github.com/joshuatz/linkedin-to-jsonresume/pull/56)). If you still need the `v0.0.16` schema output, it is no longer the default, but is still available for now under the "legacy" schema option. Thanks @ [anthonyjdella](https://github.com/anthonyjdella) for the PR and code contributions!<br/><br/>Fix: Also rolled into this release is a fix for truncated volunteer experiences (see [#55](https://github.com/joshuatz/linkedin-to-jsonresume/issues/55)). Thanks @ [fkrauthan](https://github.com/fkrauthan) for the heads up!
 2/27/2021 | 2.1.2 | Fix: Multiple issues around work history / experience; missing titles, ordering, etc. Overhauled approach to extracting work entries.
 12/19/2020 | 2.1.1 | Fix: Ordering of work history with new API endpoint ([#38](https://github.com/joshuatz/linkedin-to-jsonresume/issues/38))
 12/7/2020 | 2.1.0 | Fix: Issue with multilingual profile, when exporting your own profile with a different locale than your profile's default. ([#37](https://github.com/joshuatz/linkedin-to-jsonresume/pull/37))

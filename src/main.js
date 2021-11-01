@@ -53,7 +53,8 @@ window.LinkedinToResumeJson = (() => {
         dash: {
             profilePositionGroups:
                 '/identity/dash/profilePositionGroups?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup-21',
-            fullProfile: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-53'
+            fullProfile: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-53',
+            profileVolunteerExperiences: '/identity/dash/profileVolunteerExperiences?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}'
         }
     };
     let _scrolledToLoad = false;
@@ -333,6 +334,32 @@ window.LinkedinToResumeJson = (() => {
     }
 
     /**
+     * Parse a LI volunteer experience object and push the parsed volunteer entry to Resume
+     * @param {LiEntity} volunteerEntryObj
+     * @param {InternalDb} db
+     */
+    function parseAndPushVolunteerExperience(volunteerEntryObj, db) {
+        /** @type {ResumeSchemaLegacy['volunteer'][0]} */
+        const parsedVolunteerWork = {
+            organization: volunteerEntryObj.companyName,
+            position: volunteerEntryObj.role,
+            website: companyLiPageFromCompanyUrn(volunteerEntryObj['companyUrn'], db),
+            startDate: '',
+            endDate: '',
+            summary: volunteerEntryObj.description,
+            highlights: []
+        };
+        parseAndAttachResumeDates(parsedVolunteerWork, volunteerEntryObj);
+
+        // Push to final json
+        _outputJsonLegacy.volunteer.push(parsedVolunteerWork);
+        _outputJsonStable.volunteer.push({
+            ...lazyCopy(parsedVolunteerWork, ['website']),
+            url: parsedVolunteerWork.website
+        });
+    }
+
+    /**
      * Main parser for giant profile JSON block
      * @param {LinkedinToResumeJson} instance
      * @param {LiResponse} liResponse
@@ -529,28 +556,22 @@ window.LinkedinToResumeJson = (() => {
             }
 
             // Parse volunteer experience
-            const volunteerEntries = db.getValuesByKey(_liTypeMappings.volunteerWork.tocKeys);
-            volunteerEntries.forEach((volunteering) => {
-                /** @type {ResumeSchemaLegacy['volunteer'][0]} */
-                const parsedVolunteerWork = {
-                    organization: volunteering.companyName,
-                    position: volunteering.role,
-                    website: companyLiPageFromCompanyUrn(volunteering['companyUrn'], db),
-                    startDate: '',
-                    endDate: '',
-                    summary: volunteering.description,
-                    highlights: []
-                };
-                parseAndAttachResumeDates(parsedVolunteerWork, volunteering);
-
-                // Push to final json
-                _outputJsonLegacy.volunteer.push(parsedVolunteerWork);
-                _outputJsonStable.volunteer.push({
-                    ...lazyCopy(parsedVolunteerWork, ['website']),
-                    url: parsedVolunteerWork.website
+            let allVolunteerCanBeCaptured = true;
+            const volunteerView = db.getValueByKey([..._liTypeMappings.volunteerWork.tocKeys]);
+            if (volunteerView.paging) {
+                const { paging } = volunteerView;
+                allVolunteerCanBeCaptured = paging.start + paging.count >= paging.total;
+            }
+            if (allVolunteerCanBeCaptured) {
+                const volunteerEntries = db.getValuesByKey(_liTypeMappings.volunteerWork.tocKeys);
+                volunteerEntries.forEach((volunteering) => {
+                    parseAndPushVolunteerExperience(volunteering, db);
                 });
-            });
-            resultSummary.sections.volunteer = volunteerEntries.length ? 'success' : 'empty';
+                resultSummary.sections.volunteer = volunteerEntries.length ? 'success' : 'empty';
+            } else {
+                _this.debugConsole.warn('Volunteer entries in profile are truncated');
+                resultSummary.sections.volunteer = 'incomplete';
+            }
 
             /** @type {ResumeSchemaBeyondSpec['certificates']} */
             const certificates = [];
@@ -808,6 +829,11 @@ window.LinkedinToResumeJson = (() => {
                 _outputJsonStable.education = [];
                 await this.parseViaInternalApiEducation();
             }
+            if (profileParserResult.sections.volunteer === 'incomplete') {
+                _outputJsonLegacy.volunteer = [];
+                _outputJsonStable.education = [];
+                await this.parseViaInternalApiVolunteer();
+            }
 
             this.debugConsole.log({
                 _outputJsonLegacy,
@@ -1007,7 +1033,7 @@ window.LinkedinToResumeJson = (() => {
             // - Instead of storing *elements (positions) directly,
             // there is a pointer to a "collection" that has to be followed
             /** @type {string | string[] | undefined} */
-            let profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
+            const profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
             if (profilePositionInGroupCollectionUrns) {
                 const positionCollections = db.getElementsByUrns(profilePositionInGroupCollectionUrns);
                 // Another level... traverse collections
@@ -1063,6 +1089,20 @@ window.LinkedinToResumeJson = (() => {
             });
         } catch (e) {
             this.debugConsole.warn('Error parsing using internal API (Voyager) - Education', e);
+        }
+    };
+
+    LinkedinToResumeJson.prototype.parseViaInternalApiVolunteer = async function parseViaInternalApiVolunteer() {
+        try {
+            const volunteerResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profileVolunteerExperiences);
+            volunteerResponses.forEach((response) => {
+                const db = buildDbFromLiSchema(response);
+                db.getElementsByType(_liTypeMappings.volunteerWork.types).forEach((volunteerEntry) => {
+                    parseAndPushVolunteerExperience(volunteerEntry, db);
+                });
+            });
+        } catch (e) {
+            this.debugConsole.warn('Error parsing using internal API (Voyager) - Volunteer Entries', e);
         }
     };
 

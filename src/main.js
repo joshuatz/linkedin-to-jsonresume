@@ -359,7 +359,8 @@ window.LinkedinToResumeJson = (() => {
             endDate: parsedWork.endDate,
             highlights: parsedWork.highlights,
             summary: parsedWork.summary,
-            url: parsedWork.website
+            url: parsedWork.website,
+            location: positionObj.locationName
         });
     }
 

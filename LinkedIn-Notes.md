@@ -8,6 +8,7 @@ Back to main README: [click here](./README.md)
  - Other projects that use the unofficial Voyager API:
      - [tomquirk/linkedin-api](https://github.com/tomquirk/linkedin-api)
      - [eilonmore/linkedin-private-api](https://github.com/eilonmore/linkedin-private-api)
+     - [jarivas/linkedin-exporter](https://github.com/jarivas/linkedin-exporter)
  - LinkedIn DataHub (this powers a lot of the backend)
      - [Blog Post](https://engineering.linkedin.com/blog/2019/data-hub)
      - [Github Repo](https://github.com/linkedin/datahub)

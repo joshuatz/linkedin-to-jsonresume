@@ -409,6 +409,7 @@ window.LinkedinToResumeJson = (() => {
             parseSuccess: false,
             sections: {
                 basics: 'fail',
+                languages: 'fail',
                 attachments: 'fail',
                 education: 'fail',
                 work: 'fail',
@@ -492,7 +493,7 @@ window.LinkedinToResumeJson = (() => {
                     };
                     /** @type {ResumeSchemaLegacy['languages'][0]} */
                     const formatttedLang = {
-                        language: localeObject.language,
+                        language: localeObject.language.toLowerCase() === 'en' ? 'English' : localeObject.language,
                         fluency: 'Native Speaker'
                     };
                     _outputJsonLegacy.languages.push(formatttedLang);
@@ -505,6 +506,42 @@ window.LinkedinToResumeJson = (() => {
                     resultSummary.localeStr = parsedLocaleStr;
                 }
             });
+
+            // Parse languages (in _addition_ to the core profile language)
+            /** @type {ResumeSchemaStable['languages']} */
+            let languages = [];
+            const languageElements = db.getValuesByKey(_liTypeMappings.languages.tocKeys);
+            languageElements.forEach((languageMeta) => {
+                /** @type {Record<string,string>} */
+                const liProficiencyEnumToJsonResumeStr = {
+                    NATIVE_OR_BILINGUAL: 'Native Speaker',
+                    FULL_PROFESSIONAL: 'Full Professional',
+                    EXPERT: 'Expert',
+                    ADVANCED: 'Advanced',
+                    PROFESSIONAL_WORKING: 'Professional Working',
+                    LIMITED_WORKING: 'Limited Working',
+                    INTERMEDIATE: 'intermediate',
+                    BEGINNER: 'Beginner',
+                    ELEMENTARY: 'Elementary'
+                };
+                const liProficiency = typeof languageMeta.proficiency === 'string' ? languageMeta.proficiency.toUpperCase() : undefined;
+                if (liProficiency && liProficiency in liProficiencyEnumToJsonResumeStr) {
+                    languages.push({
+                        fluency: liProficiencyEnumToJsonResumeStr[liProficiency],
+                        language: languageMeta.name
+                    });
+                }
+            });
+            // Merge with main profile language, while preventing duplicate
+            languages = [
+                ..._outputJsonStable.languages.filter((e) => {
+                    return !languages.find((l) => l.language === e.language);
+                }),
+                ...languages
+            ];
+            _outputJsonLegacy.languages = languages;
+            _outputJsonStable.languages = languages;
+            resultSummary.sections.languages = languages.length ? 'success' : 'empty';
 
             // Parse attachments / portfolio links
             const attachments = db.getValuesByKey(_liTypeMappings.attachments.tocKeys);

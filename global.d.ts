@@ -124,6 +124,7 @@ declare global {
         parseSuccess: boolean;
         sections: {
             basics: CaptureResult;
+            languages: CaptureResult;
             attachments: CaptureResult;
             education: CaptureResult;
             work: CaptureResult;

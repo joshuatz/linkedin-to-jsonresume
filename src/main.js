@@ -655,7 +655,7 @@ window.LinkedinToResumeJson = (() => {
                 certificates.push(certObj);
             });
             resultSummary.sections.certificates = certificates.length ? 'success' : 'empty';
-            _outputJsonBetaPartial.certificates = certificates;
+            _outputJsonStable.certificates = certificates;
 
             // Parse skills
             /** @type {string[]} */

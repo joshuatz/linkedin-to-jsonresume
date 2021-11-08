@@ -67,24 +67,53 @@ window.LinkedinToResumeJson = (() => {
      * @returns {InternalDb}
      */
     function buildDbFromLiSchema(schemaJson) {
-        /** @type {Partial<InternalDb> & Pick<InternalDb, 'entitiesByUrn' | 'entities'>} */
-        const template = {
-            /** @type {InternalDb['entitiesByUrn']} */
-            entitiesByUrn: {},
-            /** @type {InternalDb['entities']} */
-            entities: []
-        };
-        const db = template;
-        db.tableOfContents = schemaJson.data;
+        /**
+         * In LI response, `response.data.*elements _can_ contain an array of ordered URNs
+         */
+        const possibleResponseDirectUrnArrayKeys = ['*elements', 'elements'];
+        /** @type {InternalDb['entitiesByUrn']} */
+        const entitiesByUrn = {};
+        /** @type {InternalDb['entities']} */
+        const entities = [];
+
+        // `response.included` often has a sort order that does *not* match the page. If `response.data.*elements` is
+        // included, we should try to reorder `included` before passing it through to other parts of the DB, so as to
+        // preserve intended sort order as much as possible
+        for (let x = 0; x < possibleResponseDirectUrnArrayKeys.length; x++) {
+            /** @type {string[] | undefined} */
+            const elementsUrnArr = schemaJson.data[possibleResponseDirectUrnArrayKeys[x]];
+            if (Array.isArray(elementsUrnArr)) {
+                const sorted = [];
+                elementsUrnArr.forEach((urn) => {
+                    const matching = schemaJson.included.find((e) => e.entityUrn === urn);
+                    if (matching) {
+                        sorted.push(matching);
+                    }
+                });
+                // Put any remaining elements in last
+                sorted.push(...schemaJson.included.filter((e) => !elementsUrnArr.includes(e.entityUrn)));
+                schemaJson.included = sorted;
+                break;
+            }
+        }
+
+        // Copy all `included` entities to internal DB arrays, which might or might not be sorted at this point
         for (let x = 0; x < schemaJson.included.length; x++) {
             /** @type {LiEntity & {key: string}} */
             const currRow = {
                 key: schemaJson.included[x].entityUrn,
                 ...schemaJson.included[x]
             };
-            db.entitiesByUrn[currRow.entityUrn] = currRow;
-            db.entities.push(currRow);
+            entitiesByUrn[currRow.entityUrn] = currRow;
+            entities.push(currRow);
         }
+
+        /** @type {Partial<InternalDb> & Pick<InternalDb,'entitiesByUrn' | 'entities' | 'tableOfContents'>} */
+        const db = {
+            entitiesByUrn,
+            entities,
+            tableOfContents: schemaJson.data
+        };
         delete db.tableOfContents['included'];
         /**
          * Get list of element keys (if applicable)
@@ -94,13 +123,13 @@ window.LinkedinToResumeJson = (() => {
          * tangentially (e.g. `book` entities and `author` entities, return in the
          * same response). In this case, `elements` are those that directly satisfy
          *  the request, and the other items in `included` are those related
+         *
+         * Order provided by LI in HTTP response is passed through, if exists
          * @returns {string[]}
          */
         db.getElementKeys = function getElementKeys() {
-            /** @type {string[]} */
-            const searchKeys = ['*elements', 'elements'];
-            for (let x = 0; x < searchKeys.length; x++) {
-                const key = searchKeys[x];
+            for (let x = 0; x < possibleResponseDirectUrnArrayKeys.length; x++) {
+                const key = possibleResponseDirectUrnArrayKeys[x];
                 const matchingArr = db.tableOfContents[key];
                 if (Array.isArray(matchingArr)) {
                     return matchingArr;
@@ -155,9 +184,10 @@ window.LinkedinToResumeJson = (() => {
          * @type {InternalDb['getValuesByKey']}
          */
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
+            /** @type {LiEntity[]} */
             const values = [];
             if (Array.isArray(key)) {
-                return [].concat(
+                return values.concat(
                     ...key.map((k) => {
                         return this.getValuesByKey(k, optTocValModifier);
                     })
@@ -168,29 +198,29 @@ window.LinkedinToResumeJson = (() => {
                 tocVal = optTocValModifier(tocVal);
             }
             // tocVal will usually be a single string that is a key to another lookup. In rare cases, it is an array of direct keys
-            let matchingDbIndexs = [];
+            let matchingDbIndexes = [];
             // Array of direct keys to sub items
             if (Array.isArray(tocVal)) {
-                matchingDbIndexs = tocVal;
+                matchingDbIndexes = tocVal;
             }
             // String pointing to sub item
             else if (tocVal) {
                 const subToc = this.entitiesByUrn[tocVal];
                 // Needs secondary lookup if has elements property with list of keys pointing to other sub items
                 if (subToc['*elements'] && Array.isArray(subToc['*elements'])) {
-                    matchingDbIndexs = subToc['*elements'];
+                    matchingDbIndexes = subToc['*elements'];
                 }
                 // Sometimes they use 'elements' instead of '*elements"...
                 else if (subToc['elements'] && Array.isArray(subToc['elements'])) {
-                    matchingDbIndexs = subToc['elements'];
+                    matchingDbIndexes = subToc['elements'];
                 } else {
                     // The object itself should be the return row
                     values.push(subToc);
                 }
             }
-            for (let x = 0; x < matchingDbIndexs.length; x++) {
-                if (typeof this.entitiesByUrn[matchingDbIndexs[x]] !== 'undefined') {
-                    values.push(this.entitiesByUrn[matchingDbIndexs[x]]);
+            for (let x = 0; x < matchingDbIndexes.length; x++) {
+                if (typeof this.entitiesByUrn[matchingDbIndexes[x]] !== 'undefined') {
+                    values.push(this.entitiesByUrn[matchingDbIndexes[x]]);
                 }
             }
             return values;

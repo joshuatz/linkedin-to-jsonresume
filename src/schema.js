@@ -33,6 +33,10 @@ export const liTypeMappings = {
         ],
         recipes: ['com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities']
     },
+    languages: {
+        tocKeys: ['*languageView'],
+        types: ['com.linkedin.voyager.identity.profile.Language']
+    },
     certificates: {
         tocKeys: ['*certificationView', '*profileCertifications'],
         types: ['com.linkedin.voyager.dash.identity.profile.Certification'],

@@ -67,24 +67,53 @@ window.LinkedinToResumeJson = (() => {
      * @returns {InternalDb}
      */
     function buildDbFromLiSchema(schemaJson) {
-        /** @type {Partial<InternalDb> & Pick<InternalDb, 'entitiesByUrn' | 'entities'>} */
-        const template = {
-            /** @type {InternalDb['entitiesByUrn']} */
-            entitiesByUrn: {},
-            /** @type {InternalDb['entities']} */
-            entities: []
-        };
-        const db = template;
-        db.tableOfContents = schemaJson.data;
+        /**
+         * In LI response, `response.data.*elements _can_ contain an array of ordered URNs
+         */
+        const possibleResponseDirectUrnArrayKeys = ['*elements', 'elements'];
+        /** @type {InternalDb['entitiesByUrn']} */
+        const entitiesByUrn = {};
+        /** @type {InternalDb['entities']} */
+        const entities = [];
+
+        // `response.included` often has a sort order that does *not* match the page. If `response.data.*elements` is
+        // included, we should try to reorder `included` before passing it through to other parts of the DB, so as to
+        // preserve intended sort order as much as possible
+        for (let x = 0; x < possibleResponseDirectUrnArrayKeys.length; x++) {
+            /** @type {string[] | undefined} */
+            const elementsUrnArr = schemaJson.data[possibleResponseDirectUrnArrayKeys[x]];
+            if (Array.isArray(elementsUrnArr)) {
+                const sorted = [];
+                elementsUrnArr.forEach((urn) => {
+                    const matching = schemaJson.included.find((e) => e.entityUrn === urn);
+                    if (matching) {
+                        sorted.push(matching);
+                    }
+                });
+                // Put any remaining elements in last
+                sorted.push(...schemaJson.included.filter((e) => !elementsUrnArr.includes(e.entityUrn)));
+                schemaJson.included = sorted;
+                break;
+            }
+        }
+
+        // Copy all `included` entities to internal DB arrays, which might or might not be sorted at this point
         for (let x = 0; x < schemaJson.included.length; x++) {
             /** @type {LiEntity & {key: string}} */
             const currRow = {
                 key: schemaJson.included[x].entityUrn,
                 ...schemaJson.included[x]
             };
-            db.entitiesByUrn[currRow.entityUrn] = currRow;
-            db.entities.push(currRow);
+            entitiesByUrn[currRow.entityUrn] = currRow;
+            entities.push(currRow);
         }
+
+        /** @type {Partial<InternalDb> & Pick<InternalDb,'entitiesByUrn' | 'entities' | 'tableOfContents'>} */
+        const db = {
+            entitiesByUrn,
+            entities,
+            tableOfContents: schemaJson.data
+        };
         delete db.tableOfContents['included'];
         /**
          * Get list of element keys (if applicable)
@@ -94,13 +123,13 @@ window.LinkedinToResumeJson = (() => {
          * tangentially (e.g. `book` entities and `author` entities, return in the
          * same response). In this case, `elements` are those that directly satisfy
          *  the request, and the other items in `included` are those related
+         *
+         * Order provided by LI in HTTP response is passed through, if exists
          * @returns {string[]}
          */
         db.getElementKeys = function getElementKeys() {
-            /** @type {string[]} */
-            const searchKeys = ['*elements', 'elements'];
-            for (let x = 0; x < searchKeys.length; x++) {
-                const key = searchKeys[x];
+            for (let x = 0; x < possibleResponseDirectUrnArrayKeys.length; x++) {
+                const key = possibleResponseDirectUrnArrayKeys[x];
                 const matchingArr = db.tableOfContents[key];
                 if (Array.isArray(matchingArr)) {
                     return matchingArr;
@@ -155,9 +184,10 @@ window.LinkedinToResumeJson = (() => {
          * @type {InternalDb['getValuesByKey']}
          */
         db.getValuesByKey = function getValuesByKey(key, optTocValModifier) {
+            /** @type {LiEntity[]} */
             const values = [];
             if (Array.isArray(key)) {
-                return [].concat(
+                return values.concat(
                     ...key.map((k) => {
                         return this.getValuesByKey(k, optTocValModifier);
                     })
@@ -168,29 +198,29 @@ window.LinkedinToResumeJson = (() => {
                 tocVal = optTocValModifier(tocVal);
             }
             // tocVal will usually be a single string that is a key to another lookup. In rare cases, it is an array of direct keys
-            let matchingDbIndexs = [];
+            let matchingDbIndexes = [];
             // Array of direct keys to sub items
             if (Array.isArray(tocVal)) {
-                matchingDbIndexs = tocVal;
+                matchingDbIndexes = tocVal;
             }
             // String pointing to sub item
             else if (tocVal) {
                 const subToc = this.entitiesByUrn[tocVal];
                 // Needs secondary lookup if has elements property with list of keys pointing to other sub items
                 if (subToc['*elements'] && Array.isArray(subToc['*elements'])) {
-                    matchingDbIndexs = subToc['*elements'];
+                    matchingDbIndexes = subToc['*elements'];
                 }
                 // Sometimes they use 'elements' instead of '*elements"...
                 else if (subToc['elements'] && Array.isArray(subToc['elements'])) {
-                    matchingDbIndexs = subToc['elements'];
+                    matchingDbIndexes = subToc['elements'];
                 } else {
                     // The object itself should be the return row
                     values.push(subToc);
                 }
             }
-            for (let x = 0; x < matchingDbIndexs.length; x++) {
-                if (typeof this.entitiesByUrn[matchingDbIndexs[x]] !== 'undefined') {
-                    values.push(this.entitiesByUrn[matchingDbIndexs[x]]);
+            for (let x = 0; x < matchingDbIndexes.length; x++) {
+                if (typeof this.entitiesByUrn[matchingDbIndexes[x]] !== 'undefined') {
+                    values.push(this.entitiesByUrn[matchingDbIndexes[x]]);
                 }
             }
             return values;
@@ -379,6 +409,7 @@ window.LinkedinToResumeJson = (() => {
             parseSuccess: false,
             sections: {
                 basics: 'fail',
+                languages: 'fail',
                 attachments: 'fail',
                 education: 'fail',
                 work: 'fail',
@@ -462,7 +493,7 @@ window.LinkedinToResumeJson = (() => {
                     };
                     /** @type {ResumeSchemaLegacy['languages'][0]} */
                     const formatttedLang = {
-                        language: localeObject.language,
+                        language: localeObject.language.toLowerCase() === 'en' ? 'English' : localeObject.language,
                         fluency: 'Native Speaker'
                     };
                     _outputJsonLegacy.languages.push(formatttedLang);
@@ -475,6 +506,42 @@ window.LinkedinToResumeJson = (() => {
                     resultSummary.localeStr = parsedLocaleStr;
                 }
             });
+
+            // Parse languages (in _addition_ to the core profile language)
+            /** @type {ResumeSchemaStable['languages']} */
+            let languages = [];
+            const languageElements = db.getValuesByKey(_liTypeMappings.languages.tocKeys);
+            languageElements.forEach((languageMeta) => {
+                /** @type {Record<string,string>} */
+                const liProficiencyEnumToJsonResumeStr = {
+                    NATIVE_OR_BILINGUAL: 'Native Speaker',
+                    FULL_PROFESSIONAL: 'Full Professional',
+                    EXPERT: 'Expert',
+                    ADVANCED: 'Advanced',
+                    PROFESSIONAL_WORKING: 'Professional Working',
+                    LIMITED_WORKING: 'Limited Working',
+                    INTERMEDIATE: 'intermediate',
+                    BEGINNER: 'Beginner',
+                    ELEMENTARY: 'Elementary'
+                };
+                const liProficiency = typeof languageMeta.proficiency === 'string' ? languageMeta.proficiency.toUpperCase() : undefined;
+                if (liProficiency && liProficiency in liProficiencyEnumToJsonResumeStr) {
+                    languages.push({
+                        fluency: liProficiencyEnumToJsonResumeStr[liProficiency],
+                        language: languageMeta.name
+                    });
+                }
+            });
+            // Merge with main profile language, while preventing duplicate
+            languages = [
+                ..._outputJsonStable.languages.filter((e) => {
+                    return !languages.find((l) => l.language === e.language);
+                }),
+                ...languages
+            ];
+            _outputJsonLegacy.languages = languages;
+            _outputJsonStable.languages = languages;
+            resultSummary.sections.languages = languages.length ? 'success' : 'empty';
 
             // Parse attachments / portfolio links
             const attachments = db.getValuesByKey(_liTypeMappings.attachments.tocKeys);
@@ -588,7 +655,7 @@ window.LinkedinToResumeJson = (() => {
                 certificates.push(certObj);
             });
             resultSummary.sections.certificates = certificates.length ? 'success' : 'empty';
-            _outputJsonBetaPartial.certificates = certificates;
+            _outputJsonStable.certificates = certificates;
 
             // Parse skills
             /** @type {string[]} */
@@ -1002,19 +1069,29 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     * Extract work positions via traversal through position groups
-     *  - LI groups "positions" by "positionGroups" - e.g. if you had three positions at the same company, with no breaks in-between to work at another company, those three positions are grouped under a single positionGroup
-     *  - LI also uses positionGroups to preserve order, whereas a direct lookup by type or recipe might not return ordered results
-     *  - This method will try to return ordered results first, and then fall back to any matching positition entities if it can't find an ordered lookup path
+     * Some LI entities are "rolled-up" through intermediate groupings; this function takes a multi-pronged approach to
+     * try and traverse through to the underlying elements. Right now only used for work position groupings
      * @param {InternalDb} db
+     * @param {object} lookupConfig
+     * @param {string | string[]} lookupConfig.multiRootKey Example: `'*profilePositionGroups'`
+     * @param {string} lookupConfig.singleRootVoyagerTypeString Example: `'com.linkedin.voyager.dash.identity.profile.PositionGroup'`
+     * @param {string} lookupConfig.elementsInGroupCollectionResponseKey Example: `'*profilePositionInPositionGroup'`
+     * @param {string | undefined} lookupConfig.fallbackElementGroupViewKey Example: `'*positionGroupView'`
+     * @param {string | undefined} lookupConfig.fallbackElementGroupUrnArrayKey Example: `'*positions'`
+     * @param {string | string[] | undefined} lookupConfig.fallbackTocKeys Example: `['*positionView']`
+     * @param {string | string[] | undefined} lookupConfig.fallbackTypeStrings Example: `['com.linkedin.voyager.identity.profile.Position', 'com.linkedin.voyager.dash.identity.profile.Position']`
      */
-    LinkedinToResumeJson.prototype.getWorkPositions = function getWorkPositions(db) {
+    LinkedinToResumeJson.prototype.getElementsThroughGroup = function getElementsThroughGroup(
+        db,
+        { multiRootKey, singleRootVoyagerTypeString, elementsInGroupCollectionResponseKey, fallbackElementGroupViewKey, fallbackElementGroupUrnArrayKey, fallbackTocKeys, fallbackTypeStrings }
+    ) {
         const rootElements = db.getElements() || [];
         /** @type {LiEntity[]} */
-        let positions = [];
+        let finalEntities = [];
 
         /**
-         * There are multiple ways that work positions can be nested within a profileView, or other data structure
+         * There are multiple ways that ordered / grouped elements can be nested within a profileView, or other data structure
+         * Using example of work positions:
          *  A) **ROOT** -> *profilePositionGroups -> PositionGroup[] -> *profilePositionInPositionGroup (COLLECTION) -> Position[]
          *  B) **ROOT** -> *positionGroupView -> PositionGroupView -> PositionGroup[] -> *positions -> Position[]
          */
@@ -1023,44 +1100,63 @@ window.LinkedinToResumeJson = (() => {
         // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
         // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
         // You can bypass by looking up by `Position` type, but then original ordering is not preserved
-        let profilePositionGroups = db.getValuesByKey('*profilePositionGroups');
+        let profileElementGroups = db.getValuesByKey(multiRootKey);
         // Check for voyager profilePositionGroups response, where all groups are direct children of root element
-        if (!profilePositionGroups.length && rootElements.length && rootElements[0].$type === 'com.linkedin.voyager.dash.identity.profile.PositionGroup') {
-            profilePositionGroups = rootElements;
+        if (!profileElementGroups.length && rootElements.length && rootElements[0].$type === singleRootVoyagerTypeString) {
+            profileElementGroups = rootElements;
         }
-        profilePositionGroups.forEach((pGroup) => {
-            // This element (profilePositionGroup) is one way how LI groups positions
+        profileElementGroups.forEach((pGroup) => {
+            // This element (profileElementsGroup) is one way how LI groups positions
             // - Instead of storing *elements (positions) directly,
             // there is a pointer to a "collection" that has to be followed
             /** @type {string | string[] | undefined} */
-            const profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
+            const profilePositionInGroupCollectionUrns = pGroup[elementsInGroupCollectionResponseKey];
             if (profilePositionInGroupCollectionUrns) {
                 const positionCollections = db.getElementsByUrns(profilePositionInGroupCollectionUrns);
                 // Another level... traverse collections
                 positionCollections.forEach((collection) => {
                     // Final lookup via standard collection['*elements']
-                    positions = positions.concat(db.getElementsByUrns(collection['*elements'] || []));
+                    finalEntities = finalEntities.concat(db.getElementsByUrns(collection['*elements'] || []));
                 });
             }
         });
 
-        if (!positions.length) {
-            db.getValuesByKey('*positionGroupView').forEach((pGroup) => {
-                positions = positions.concat(db.getElementsByUrns(pGroup['*positions'] || []));
+        if (!finalEntities.length && !!fallbackElementGroupViewKey && !!fallbackElementGroupUrnArrayKey) {
+            db.getValuesByKey(fallbackElementGroupViewKey).forEach((pGroup) => {
+                finalEntities = finalEntities.concat(db.getElementsByUrns(pGroup[fallbackElementGroupUrnArrayKey] || []));
             });
         }
 
-        if (!positions.length) {
+        if (!finalEntities.length && !!fallbackTocKeys) {
             // Direct lookup - by main TOC keys
-            positions = db.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
+            finalEntities = db.getValuesByKey(fallbackTocKeys);
         }
 
-        if (!positions.length) {
+        if (!finalEntities.length && !!fallbackTypeStrings) {
             // Direct lookup - by type
-            positions = db.getElementsByType(_liTypeMappings.workPositions.types);
+            finalEntities = db.getElementsByType(fallbackTypeStrings);
         }
 
-        return positions;
+        return finalEntities;
+    };
+
+    /**
+     * Extract work positions via traversal through position groups
+     *  - LI groups "positions" by "positionGroups" - e.g. if you had three positions at the same company, with no breaks in-between to work at another company, those three positions are grouped under a single positionGroup
+     *  - LI also uses positionGroups to preserve order, whereas a direct lookup by type or recipe might not return ordered results
+     *  - This method will try to return ordered results first, and then fall back to any matching position entities if it can't find an ordered lookup path
+     * @param {InternalDb} db
+     */
+    LinkedinToResumeJson.prototype.getWorkPositions = function getWorkPositions(db) {
+        return this.getElementsThroughGroup(db, {
+            multiRootKey: '*profilePositionGroups',
+            singleRootVoyagerTypeString: 'com.linkedin.voyager.dash.identity.profile.PositionGroup',
+            elementsInGroupCollectionResponseKey: '*profilePositionInPositionGroup',
+            fallbackElementGroupViewKey: '*positionGroupView',
+            fallbackElementGroupUrnArrayKey: '*positions',
+            fallbackTocKeys: _liTypeMappings.workPositions.tocKeys,
+            fallbackTypeStrings: _liTypeMappings.workPositions.types
+        });
     };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {

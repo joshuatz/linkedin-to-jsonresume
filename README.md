@@ -8,6 +8,21 @@
 
 ![Demo GIF](demo-chrome_extension.gif "Demo Gif")
 
+## What is JSON Resume?
+"JSON Resume" is an open-source standard / schema, currently gaining in adoption, that standardizes the content of a resume into a shared underlying structure that others can use in automated resume formatters, parsers, etc. Read more about it [here](https://jsonresume.org/), or on [GitHub](https://github.com/jsonresume).
+
+## What is this tool?
+I made this because I wanted a way to quickly generate a JSON Resume export from my LinkedIn profile, and got frustrated with how locked down the LinkedIn APIs are and how slow it is to request your data export (up to 72 hours). "Install" the tool to your browser, then click to run it while looking at a LinkedIn profile (preferably your own), and my code will grab the various pieces of information off the page and then show a popup with the full JSON resume export that you can copy and paste to wherever you would like.
+
+## A Note About Feature Requests and Bug Reports
+I want to make something clear: the only goal of this extension is to be able to export a JSON Resume version of your LinkedIn profile; nothing more, nothing less.
+
+If the tool is malfunctioning or could do a better job of exporting JSON Resume, by all means please open an issue - I always appreciate it!
+
+However, I have gotten several feature requests (as both issues and emails) asking me to extend the tool to do things that are far outside this goal. While I appreciate the interest, ultimately I am not interested in having this project grow outside the original scope - you will usually see me close this issues as `wontfix` and will reply to emails the same way. I have limited time, and this project was originally something I whipped up in a few days for _personal_ use - it has ***already*** gotten way out of scope 😅
+
+---
+
 ## Breaking Change - `v1.0` Schema Update
 The 10/31/2021 release of this extension (`v3.0.0`) changes the default shape of the JSON exported by this tool, to adhere to the newer `v1` schema offered by JSON Resume:
 
@@ -127,14 +142,6 @@ Date | Release | Notes
 7/22/2019 | NA | ***ALERT***: This bookmarklet is currently broken, thanks to LinkedIn adding a new restrictive CSP (Content Security Policy) header to the site. [I've opened an issue](https://github.com/joshuatz/linkedin-to-jsonresume-bookmarklet/issues/1) to discuss this, and both short-term (requires using the console) and long-term (browser extension) solutions.
 6/21/2019 | 0.0.3 | I saw the bookmarklet was broken depending on how you came to the profile page, so I refactored a bunch of code and found a much better way to pull the data. Should be much more reliable!
 </details>
-
----
-
-## What is JSON Resume?
-"JSON Resume" is an open-source standard / schema, currently gaining in adoption, that standardizes the content of a resume into a shared underlying structure that others can use in automated resume formatters, parsers, etc. Read more about it [here](https://jsonresume.org/), or on [GitHub](https://github.com/jsonresume).
-
-## What is this tool?
-I made this because I wanted a way to quickly generate a JSON Resume export from my LinkedIn profile, and got frustrated with how locked down the LinkedIn APIs are and how slow it is to request your data export (up to 72 hours). "Install" the tool to your browser, then click to run it while looking at a LinkedIn profile (preferably your own), and my code will grab the various pieces of information off the page and then show a popup with the full JSON resume export that you can copy and paste to wherever you would like.
 
 ---
 

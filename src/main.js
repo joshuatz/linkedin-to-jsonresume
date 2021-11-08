@@ -1002,19 +1002,29 @@ window.LinkedinToResumeJson = (() => {
     };
 
     /**
-     * Extract work positions via traversal through position groups
-     *  - LI groups "positions" by "positionGroups" - e.g. if you had three positions at the same company, with no breaks in-between to work at another company, those three positions are grouped under a single positionGroup
-     *  - LI also uses positionGroups to preserve order, whereas a direct lookup by type or recipe might not return ordered results
-     *  - This method will try to return ordered results first, and then fall back to any matching positition entities if it can't find an ordered lookup path
+     * Some LI entities are "rolled-up" through intermediate groupings; this function takes a multi-pronged approach to
+     * try and traverse through to the underlying elements. Right now only used for work position groupings
      * @param {InternalDb} db
+     * @param {object} lookupConfig
+     * @param {string | string[]} lookupConfig.multiRootKey Example: `'*profilePositionGroups'`
+     * @param {string} lookupConfig.singleRootVoyagerTypeString Example: `'com.linkedin.voyager.dash.identity.profile.PositionGroup'`
+     * @param {string} lookupConfig.elementsInGroupCollectionResponseKey Example: `'*profilePositionInPositionGroup'`
+     * @param {string | undefined} lookupConfig.fallbackElementGroupViewKey Example: `'*positionGroupView'`
+     * @param {string | undefined} lookupConfig.fallbackElementGroupUrnArrayKey Example: `'*positions'`
+     * @param {string | string[] | undefined} lookupConfig.fallbackTocKeys Example: `['*positionView']`
+     * @param {string | string[] | undefined} lookupConfig.fallbackTypeStrings Example: `['com.linkedin.voyager.identity.profile.Position', 'com.linkedin.voyager.dash.identity.profile.Position']`
      */
-    LinkedinToResumeJson.prototype.getWorkPositions = function getWorkPositions(db) {
+    LinkedinToResumeJson.prototype.getElementsThroughGroup = function getElementsThroughGroup(
+        db,
+        { multiRootKey, singleRootVoyagerTypeString, elementsInGroupCollectionResponseKey, fallbackElementGroupViewKey, fallbackElementGroupUrnArrayKey, fallbackTocKeys, fallbackTypeStrings }
+    ) {
         const rootElements = db.getElements() || [];
         /** @type {LiEntity[]} */
-        let positions = [];
+        let finalEntities = [];
 
         /**
-         * There are multiple ways that work positions can be nested within a profileView, or other data structure
+         * There are multiple ways that ordered / grouped elements can be nested within a profileView, or other data structure
+         * Using example of work positions:
          *  A) **ROOT** -> *profilePositionGroups -> PositionGroup[] -> *profilePositionInPositionGroup (COLLECTION) -> Position[]
          *  B) **ROOT** -> *positionGroupView -> PositionGroupView -> PositionGroup[] -> *positions -> Position[]
          */
@@ -1023,44 +1033,63 @@ window.LinkedinToResumeJson = (() => {
         // profilePositionGroup responses are a little annoying; the direct children don't point directly to position entities
         // Instead, you have to follow path of `profilePositionGroup` -> `*profilePositionInPositionGroup` -> `*elements` -> `Position`
         // You can bypass by looking up by `Position` type, but then original ordering is not preserved
-        let profilePositionGroups = db.getValuesByKey('*profilePositionGroups');
+        let profileElementGroups = db.getValuesByKey(multiRootKey);
         // Check for voyager profilePositionGroups response, where all groups are direct children of root element
-        if (!profilePositionGroups.length && rootElements.length && rootElements[0].$type === 'com.linkedin.voyager.dash.identity.profile.PositionGroup') {
-            profilePositionGroups = rootElements;
+        if (!profileElementGroups.length && rootElements.length && rootElements[0].$type === singleRootVoyagerTypeString) {
+            profileElementGroups = rootElements;
         }
-        profilePositionGroups.forEach((pGroup) => {
-            // This element (profilePositionGroup) is one way how LI groups positions
+        profileElementGroups.forEach((pGroup) => {
+            // This element (profileElementsGroup) is one way how LI groups positions
             // - Instead of storing *elements (positions) directly,
             // there is a pointer to a "collection" that has to be followed
             /** @type {string | string[] | undefined} */
-            const profilePositionInGroupCollectionUrns = pGroup['*profilePositionInPositionGroup'];
+            const profilePositionInGroupCollectionUrns = pGroup[elementsInGroupCollectionResponseKey];
             if (profilePositionInGroupCollectionUrns) {
                 const positionCollections = db.getElementsByUrns(profilePositionInGroupCollectionUrns);
                 // Another level... traverse collections
                 positionCollections.forEach((collection) => {
                     // Final lookup via standard collection['*elements']
-                    positions = positions.concat(db.getElementsByUrns(collection['*elements'] || []));
+                    finalEntities = finalEntities.concat(db.getElementsByUrns(collection['*elements'] || []));
                 });
             }
         });
 
-        if (!positions.length) {
-            db.getValuesByKey('*positionGroupView').forEach((pGroup) => {
-                positions = positions.concat(db.getElementsByUrns(pGroup['*positions'] || []));
+        if (!finalEntities.length && !!fallbackElementGroupViewKey && !!fallbackElementGroupUrnArrayKey) {
+            db.getValuesByKey(fallbackElementGroupViewKey).forEach((pGroup) => {
+                finalEntities = finalEntities.concat(db.getElementsByUrns(pGroup[fallbackElementGroupUrnArrayKey] || []));
             });
         }
 
-        if (!positions.length) {
+        if (!finalEntities.length && !!fallbackTocKeys) {
             // Direct lookup - by main TOC keys
-            positions = db.getValuesByKey(_liTypeMappings.workPositions.tocKeys);
+            finalEntities = db.getValuesByKey(fallbackTocKeys);
         }
 
-        if (!positions.length) {
+        if (!finalEntities.length && !!fallbackTypeStrings) {
             // Direct lookup - by type
-            positions = db.getElementsByType(_liTypeMappings.workPositions.types);
+            finalEntities = db.getElementsByType(fallbackTypeStrings);
         }
 
-        return positions;
+        return finalEntities;
+    };
+
+    /**
+     * Extract work positions via traversal through position groups
+     *  - LI groups "positions" by "positionGroups" - e.g. if you had three positions at the same company, with no breaks in-between to work at another company, those three positions are grouped under a single positionGroup
+     *  - LI also uses positionGroups to preserve order, whereas a direct lookup by type or recipe might not return ordered results
+     *  - This method will try to return ordered results first, and then fall back to any matching position entities if it can't find an ordered lookup path
+     * @param {InternalDb} db
+     */
+    LinkedinToResumeJson.prototype.getWorkPositions = function getWorkPositions(db) {
+        return this.getElementsThroughGroup(db, {
+            multiRootKey: '*profilePositionGroups',
+            singleRootVoyagerTypeString: 'com.linkedin.voyager.dash.identity.profile.PositionGroup',
+            elementsInGroupCollectionResponseKey: '*profilePositionInPositionGroup',
+            fallbackElementGroupViewKey: '*positionGroupView',
+            fallbackElementGroupUrnArrayKey: '*positions',
+            fallbackTocKeys: _liTypeMappings.workPositions.tocKeys,
+            fallbackTypeStrings: _liTypeMappings.workPositions.types
+        });
     };
 
     LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {

@@ -80,7 +80,7 @@ declare global {
         // Methods
         getElementKeys: () => string[];
         getElements: () => Array<LiEntity & { key: LiUrn }>;
-        getValueByKey: (key: string | string[]) => LiEntity;
+        getValueByKey: (key: string | string[]) => LiEntity | undefined;
         getValuesByKey: (key: LiUrn | LiUrn[], optTocValModifier?: TocValModifier) => LiEntity[];
         getElementsByType: (typeStr: string | string[]) => LiEntity[];
         getElementByUrn: (urn: string) => LiEntity | undefined;

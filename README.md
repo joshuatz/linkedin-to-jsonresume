@@ -118,6 +118,7 @@ If I'm trying to assist you in solving an issue with this tool, I might have you
 
 Date | Release | Notes
 --- | --- | ---
+11/7/2021 | 3.1.0 | Fix: Incorrect sorting of volunteer positions (see [#55](https://github.com/joshuatz/linkedin-to-jsonresume/issues/55))<br/>Fix: Missing Certificates (see [#59](https://github.com/joshuatz/linkedin-to-jsonresume/issues/59))<br/>Improve/Fix: Extract Language proficiencies / languages (see [#59](https://github.com/joshuatz/linkedin-to-jsonresume/issues/59))
 10/31/2021 | 3.0.0 | **Breaking Update**: This extension has now been updated to output JSON matching the `v1` schema specification released by JSON Resume (see [#53](https://github.com/joshuatz/linkedin-to-jsonresume/pull/53) and [#56](https://github.com/joshuatz/linkedin-to-jsonresume/pull/56)). If you still need the `v0.0.16` schema output, it is no longer the default, but is still available for now under the "legacy" schema option. Thanks @ [anthonyjdella](https://github.com/anthonyjdella) for the PR and code contributions!<br/><br/>Fix: Also rolled into this release is a fix for truncated volunteer experiences (see [#55](https://github.com/joshuatz/linkedin-to-jsonresume/issues/55)). Thanks @ [fkrauthan](https://github.com/fkrauthan) for the heads up!
 2/27/2021 | 2.1.2 | Fix: Multiple issues around work history / experience; missing titles, ordering, etc. Overhauled approach to extracting work entries.
 12/19/2020 | 2.1.1 | Fix: Ordering of work history with new API endpoint ([#38](https://github.com/joshuatz/linkedin-to-jsonresume/issues/38))

@@ -899,7 +899,7 @@ window.LinkedinToResumeJson = (() => {
             }
             if (profileParserResult.sections.volunteer === 'incomplete') {
                 _outputJsonLegacy.volunteer = [];
-                _outputJsonStable.education = [];
+                _outputJsonStable.volunteer = [];
                 await this.parseViaInternalApiVolunteer();
             }
 

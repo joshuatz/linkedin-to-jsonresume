@@ -1,4 +1,4 @@
-Back to main README: [click here](./README.md)
+Back to main README: [click here](../README.md)
 
 ## Resources
  - V1 Docs: https://linkedin.api-docs.io

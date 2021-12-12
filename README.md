@@ -6,7 +6,7 @@
 
 ## My LinkedIn Profile 👨‍💼 - [linkedin.com/in/joshuatzucker/](https://www.linkedin.com/in/joshuatzucker/)
 
-![Demo GIF](demo-chrome_extension.gif "Demo Gif")
+![Demo GIF](./docs/demo-chrome_extension.gif "Demo Gif")
 
 ## What is JSON Resume?
 "JSON Resume" is an open-source standard / schema, currently gaining in adoption, that standardizes the content of a resume into a shared underlying structure that others can use in automated resume formatters, parsers, etc. Read more about it [here](https://jsonresume.org/), or on [GitHub](https://github.com/jsonresume).
@@ -65,13 +65,13 @@ For example, if you are bilingual in both English and German, you could create o
 
 I've implemented support (starting with `v1.0.0`) for multilingual profile export through a dropdown selector:
 
-![Export Language Selector](multilingual-support.png)
+![Export Language Selector](./docs/multilingual-support.png)
 
 The dropdown should automatically get populated with the languages that the profile you are currently viewing supports, in addition to your own preferred viewing language in the #1 spot. You should be able to switch between languages in the dropdown and click the export button to get a JSON Resume export with your selected language.
 
 > Note: LinkedIn offers language choices through [a `Locale` string](https://developer.linkedin.com/docs/ref/v2/object-types#LocaleString), which is a combination of `country` (ISO-3166) and `language` (ISO-639). I do not make decisions as to what languages are supported.
 
-> This feature is the part of this extension most likely to break in the future; LI has some serious quirks around multilingual profiles - see [my notes](./LinkedIn-Notes.md#voyager---multilingual-and-locales-support) for details.
+> This feature is the part of this extension most likely to break in the future; LI has some serious quirks around multilingual profiles - see [my notes](./docs/LinkedIn-Dev-Notes-README.md#voyager---multilingual-and-locales-support) for details.
 
 ### Export Options
 There are several main buttons in the browser extension, with different effects. You can hover over each button to see the alt text describing what they do, or read below:
@@ -166,7 +166,7 @@ All of the above should happen automatically when you do `npm run build-bookmark
 If this ever garners enough interest and needs to be updated, I will probably want to re-write it with TypeScript to make it more maintainable. 
 
 ### LinkedIn Documentation
-For understanding some peculiarities of the LI API, see [LinkedIn-Notes.md](./LinkedIn-Notes.md).
+For understanding some peculiarities of the LI API, see [LinkedIn-Dev-Notes-README.md](./docs/LinkedIn-Dev-Notes-README.md).
 
 ### Debugging
 Debugging the extension is a little cumbersome, because of the way Chrome sandboxes extension scripts and how code has to be injected. An alternative to setting breakpoints in the extension code itself, is to copy the output of `/build/main.js` and run it via the console.

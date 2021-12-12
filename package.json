@@ -10,12 +10,12 @@
         "lint:fix": "eslint \"**/*.{js,ts}\" --fix",
         "babel": "babel src --out-dir build",
         "webpack": "npx webpack --config webpack.prod.js",
-        "webpack-debug": "npx webpack --config webpack.dev.js",
-        "build-bookmarklet": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/build-bookmarklet.js",
-        "build-browserext": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/prep-browserext.js",
-        "build-browserext-debug": "node ./build-scripts/prep-dirs.js && npm run webpack-debug && node ./build-scripts/prep-browserext.js",
-        "package-browserext": "node ./build-scripts/prep-dirs.js && npm run build-browserext && node ./build-scripts/package-browserext.js",
-        "copy-debug-js-win": "yarn build-browserext-debug && less build/main.js | CLIP"
+        "webpack:debug": "npx webpack --config webpack.dev.js",
+        "build:bookmarklet": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/build-bookmarklet.js",
+        "build:browserext": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/prep-browserext.js",
+        "build:browserext-debug": "node ./build-scripts/prep-dirs.js && npm run webpack:debug && node ./build-scripts/prep-browserext.js",
+        "package:browserext": "node ./build-scripts/prep-dirs.js && npm run build:browserext && node ./build-scripts/package-browserext.js",
+        "copy:debug-js-win": "npm run build:browserext-debug && less build/main.js | CLIP"
     },
     "author": {
         "name": "Joshua Tzucker",

@@ -53,7 +53,7 @@ declare global {
             microSchema?: {
                 isGraphQL: boolean;
                 types: {
-                    [key: LiTypeStr]: {
+                    [key: string]: {
                         baseType: LiTypeStr;
                         fields: GenObj;
                     };

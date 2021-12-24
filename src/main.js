@@ -5,6 +5,7 @@
  * WARNING: This tool is not affiliated with LinkedIn in any manner. Intended use is to export your own profile data, and you, as the user, are responsible for using it within the terms and services set out by LinkedIn. I am not responsible for any misuse, or repercussions of said misuse.
  */
 
+// @ts-ignore
 import VCardsJS from '@dan/vcards';
 import { resumeJsonTemplateLegacy, resumeJsonTemplateStable, resumeJsonTemplateBetaPartial } from './templates';
 import { liSchemaKeys as _liSchemaKeys, liTypeMappings as _liTypeMappings } from './schema';

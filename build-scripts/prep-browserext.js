@@ -13,6 +13,7 @@ fse.emptyDirSync(browserBuildDir);
 fse.copySync(browserExtSrcDir, browserBuildDir);
 
 // Copy version number over to manifest, and write it out to build dir
+// @ts-ignore
 manifestJson.version = packageJson.version;
 fse.writeFileSync(`${browserBuildDir}manifest.json`, JSON.stringify(manifestJson, null, 4));
 

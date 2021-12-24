@@ -15,9 +15,10 @@
         "alwaysStrict": true,
         "declaration": false,
         "noImplicitAny": true,
-        "maxNodeModuleJsDepth": 1,
+        "maxNodeModuleJsDepth": 0,
         "target": "es2015",
         "moduleResolution": "node",
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "resolveJsonModule": true
     }
 }

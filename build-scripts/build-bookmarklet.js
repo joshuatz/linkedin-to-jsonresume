@@ -1,4 +1,5 @@
 // Dependencies
+// @ts-ignore
 const replace = require('replace');
 const fse = require('fs-extra');
 const childProc = require('child_process');

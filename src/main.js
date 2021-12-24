@@ -51,9 +51,16 @@ window.LinkedinToResumeJson = (() => {
         fullSkills: '/identity/profiles/{profileId}/skillCategory',
         recommendations: '/identity/profiles/{profileId}/recommendations',
         dash: {
-            profilePositionGroups:
-                '/identity/dash/profilePositionGroups?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup-21',
-            fullProfile: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-53',
+            profilePositionGroups: {
+                path: '/identity/dash/profilePositionGroups?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup-50',
+                template: '/identity/dash/profilePositionGroups?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}&decorationId={decorationId}',
+                recipe: 'com.linkedin.voyager.dash.deco.identity.profile.FullProfilePositionGroup'
+            },
+            fullProfile: {
+                path: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-93',
+                template: '/identity/dash/profiles?q=memberIdentity&memberIdentity={profileId}&decorationId={decorationId}',
+                recipe: 'com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities'
+            },
             profileVolunteerExperiences: '/identity/dash/profileVolunteerExperiences?q=viewee&profileUrn=urn:li:fsd_profile:{profileUrnId}'
         }
     };
@@ -784,24 +791,6 @@ window.LinkedinToResumeJson = (() => {
         this.getFullSkills = typeof OPT_getFullSkills === 'boolean' ? OPT_getFullSkills : true;
         this.preferApi = typeof OPT_preferApi === 'boolean' ? OPT_preferApi : true;
         this.debug = typeof OPT_debug === 'boolean' ? OPT_debug : false;
-        // Force use of newer Dash endpoints when possible, for debuggin
-        this.preferDash = this.debug && /forceDashEndpoint=true/i.test(document.location.href);
-        if (this.debug) {
-            console.warn('LinkedinToResumeJson - DEBUG mode is ON');
-            this.internals = {
-                buildDbFromLiSchema,
-                parseProfileSchemaJSON,
-                _defaultLocale,
-                _liSchemaKeys,
-                _liTypeMappings,
-                _voyagerEndpoints,
-                output: {
-                    _outputJsonLegacy,
-                    _outputJsonStable,
-                    _outputJsonBetaPartial
-                }
-            };
-        }
         this.debugConsole = {
             /** @type {(...args: any[]) => void} */
             log: (...args) => {
@@ -822,6 +811,46 @@ window.LinkedinToResumeJson = (() => {
                 }
             }
         };
+
+        // Try to patch _voyagerEndpoints with correct paths, if possible
+        // @TODO - get around extension sandbox issue (this doesn't really currently work unless executed outside extension)
+        if (typeof window.require === 'function') {
+            try {
+                const recipeMap = window.require('deco-recipes/pillar-recipes/profile/recipes');
+                ['profilePositionGroups', 'fullProfile'].forEach((_key) => {
+                    const key = /** @type {'profilePositionGroups' | 'fullProfile'} */ (_key);
+                    const decorationId = recipeMap[_voyagerEndpoints.dash[key].recipe];
+                    if (decorationId) {
+                        const oldPath = _voyagerEndpoints.dash[key].path;
+                        _voyagerEndpoints.dash[key].path = _voyagerEndpoints.dash[key].template.replace('{decorationId}', decorationId);
+                        this.debugConsole.log(`Patched voyagerEndpoint for ${key}; old = ${oldPath}, new = ${_voyagerEndpoints.dash[key].path}`);
+                    }
+                });
+            } catch (err) {
+                console.error(`Error trying to patch _voyagerEndpoints, `, err);
+            }
+        } else {
+            this.debugConsole.log(`Could not live-patch _voyagerEndpoints - missing window.require`);
+        }
+
+        // Force use of newer Dash endpoints when possible, for debugging
+        this.preferDash = this.debug && /forceDashEndpoint=true/i.test(document.location.href);
+        if (this.debug) {
+            console.warn('LinkedinToResumeJson - DEBUG mode is ON');
+            this.internals = {
+                buildDbFromLiSchema,
+                parseProfileSchemaJSON,
+                _defaultLocale,
+                _liSchemaKeys,
+                _liTypeMappings,
+                _voyagerEndpoints,
+                output: {
+                    _outputJsonLegacy,
+                    _outputJsonStable,
+                    _outputJsonBetaPartial
+                }
+            };
+        }
     }
 
     // Regular Methods
@@ -1162,7 +1191,7 @@ window.LinkedinToResumeJson = (() => {
 
     LinkedinToResumeJson.prototype.parseViaInternalApiWork = async function parseViaInternalApiWork() {
         try {
-            const workResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profilePositionGroups);
+            const workResponses = await this.voyagerFetchAutoPaginate(_voyagerEndpoints.dash.profilePositionGroups.path);
             workResponses.forEach((response) => {
                 const db = buildDbFromLiSchema(response);
                 this.getWorkPositions(db).forEach((position) => {
@@ -1177,7 +1206,7 @@ window.LinkedinToResumeJson = (() => {
     LinkedinToResumeJson.prototype.parseViaInternalApiEducation = async function parseViaInternalApiEducation() {
         try {
             // This is a really annoying lookup - I can't find a separate API endpoint, so I have to use the full-FULL (dash) profile endpoint...
-            const fullDashProfileObj = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile);
+            const fullDashProfileObj = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile.path);
             const db = buildDbFromLiSchema(fullDashProfileObj);
             // Response is missing ToC, so just look up by namespace / schema
             const eduEntries = db.getElementsByType('com.linkedin.voyager.dash.identity.profile.Education');
@@ -1345,7 +1374,7 @@ window.LinkedinToResumeJson = (() => {
          */
         if (!localeMatchesUser || this.preferDash === true) {
             endpointType = 'dashFullProfileWithEntities';
-            profileResponse = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile);
+            profileResponse = await this.voyagerFetch(_voyagerEndpoints.dash.fullProfile.path);
         } else {
             // use normal profileView
             profileResponse = await this.voyagerFetch(_voyagerEndpoints.fullProfileView);

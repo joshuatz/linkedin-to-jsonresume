@@ -8,20 +8,31 @@ declare global {
 
     // LI Types
 
+    /**
+     * Uniform Resource Name (URN) - very common throughout LinkedIn APIs
+     * @example urn:li:collectionResponse:acb123...
+     * @see https://docs.microsoft.com/en-us/linkedin/shared/api-guide/concepts/urns
+     */
     type LiUrn = string;
+
+    /**
+     * These are used throughout LI APIs, also referred to as "recipes" or "recipeTypes"
+     * @example com.linkedin.voyager.identity.profile.Profile
+     */
+    type LiTypeStr = `com.linkedin.${string}`;
 
     interface LiPaging {
         count: number;
         start: number;
         total?: number;
-        $recipeTypes?: string[];
+        $recipeTypes?: LiTypeStr[];
         // I've never actually seen this property populated...
         // This is probably actually `Array<com.linkedin.restli.common.Link>`
         links?: string[];
     }
 
     interface LiEntity {
-        $type: string;
+        $type: LiTypeStr;
         entityUrn: LiUrn;
         objectUrn?: LiUrn;
         [key: string]: any;
@@ -30,7 +41,7 @@ declare global {
 
     interface LiResponse {
         data: {
-            $type: string;
+            $type: LiTypeStr;
             paging?: LiPaging;
             // This is kind of a ToC, where each string corresponds to an entityUrn ID of an entity in `included`
             '*elements'?: string[];
@@ -38,12 +49,23 @@ declare global {
             [k: string]: GenObj | string | boolean;
         } & Partial<LiEntity>;
         included: LiEntity[];
+        meta?: {
+            microSchema?: {
+                isGraphQL: boolean;
+                types: {
+                    [key: LiTypeStr]: {
+                        baseType: LiTypeStr;
+                        fields: GenObj;
+                    };
+                };
+            };
+        };
     }
 
     interface LiSupportedLocale {
         country: string;
         language: string;
-        $type: string;
+        $type: LiTypeStr;
     }
 
     /**
@@ -63,10 +85,10 @@ declare global {
     interface LiWebsite {
         url: string;
         type: {
-            $type: string;
+            $type: LiTypeStr;
             category: string;
         };
-        $type: string;
+        $type: LiTypeStr;
     }
 
     type TocValModifier = (tocVal: string | string[]) => string | string[];

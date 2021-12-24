@@ -1,17 +1,21 @@
 Back to main README: [click here](../README.md)
 
 ## Resources
- - V1 Docs: https://linkedin.api-docs.io
- - V2 Docs:
-     - https://docs.microsoft.com/en-us/linkedin/
-     - https://developer.linkedin.com/docs/guide/v2
- - Other projects that use the unofficial Voyager API:
-     - [tomquirk/linkedin-api](https://github.com/tomquirk/linkedin-api)
-     - [eilonmore/linkedin-private-api](https://github.com/eilonmore/linkedin-private-api)
-     - [jarivas/linkedin-exporter](https://github.com/jarivas/linkedin-exporter)
- - LinkedIn DataHub (this powers a lot of the backend)
-     - [Blog Post](https://engineering.linkedin.com/blog/2019/data-hub)
-     - [Github Repo](https://github.com/linkedin/datahub)
+
+- V1 Docs: https://linkedin.api-docs.io
+- V2 Docs:
+    - https://docs.microsoft.com/en-us/linkedin/
+    - https://developer.linkedin.com/docs/guide/v2
+- Other projects that use the unofficial Voyager API:
+    - [tomquirk/linkedin-api](https://github.com/tomquirk/linkedin-api)
+    - [eilonmore/linkedin-private-api](https://github.com/eilonmore/linkedin-private-api)
+    - [jarivas/linkedin-exporter](https://github.com/jarivas/linkedin-exporter)
+- LinkedIn DataHub (this powers a lot of the backend)
+    - [DataHub Blog Post](https://engineering.linkedin.com/blog/2019/data-hub)
+    - [DataHub Github Repo](https://github.com/linkedin/datahub)
+- LinkedIn `Rest.li` (also powers some of the backend)
+    - [`Rest.li` GitHub Repo](https://github.com/linkedin/rest.li/)
+    - [`Rest.li` Docs](https://linkedin.github.io/rest.li/spec/protocol)
 
 ## Internal API (aka *Voyager*)
 ### Query String Syntax
@@ -36,6 +40,38 @@ To break this down further:
 
 
 > For some endpoints, only `decorationId` is required, and the other query parameters are completely omitted. Keep in mind that LI knows who is making the request based on the Auth headers.
+
+#### GraphQL Endpoints
+It looks LinkedIn has been transitioning some page components to pull data from special endpoints flavored with GraphQL. For example, `voyagerIdentityGraphQL`.
+
+Using these requires knowing a special `queryId` value ahead of time - this could be (maybe?) a server-side generated ID for an allowed query. Getting this ID is... tricky. Short answer is that it relies on some particulars of how LI is using Ember and bundling.
+
+Here is a quickly cobbled-together function to extract a queryId based on a known registered component path:
+
+```js
+/**
+ * Retrieve a GraphQL ID for a pre-registered query (?)
+ * WARNING: This relies heavily on LI internal APIs - not stable, and should be avoided when other alternatives
+ * can be used instead
+ * @param {string} graphQlModuleString - The module path specifier that the GraphQL query is "registered" under. For example, `graphql-queries/queries/profile/profile-components.graphq`
+ */
+function getGraphQlQueryId(graphQlModuleString) {
+    if (typeof window.require === 'function') {
+        const frozenRegisteredQuery = window.require(graphQlModuleString);
+        return window.require('@linkedin/ember-restli-graphql/-private/query').getGraphQLQueryId(frozenRegisteredQuery);
+    }
+    return undefined;
+}
+```
+
+### Protocol Versions
+Voyager, like the main LinkedIn API, can use different "protocol versions" of the REST API. You might run into issues with certain endpoints and query string formats if you don't specify the correct version via the `x-restli-protocol-version` header. E.g., the `voyagerIdentityGraphQL` endpoint should probably always use the v2 header:
+
+```
+x-restli-protocol-version: 2.0.0
+```
+
+For more details, see the [official API docs for Protocol Versions](https://docs.microsoft.com/en-us/linkedin/shared/api-guide/concepts/protocol-version).
 
 ### Paging Data
 #### Paging in Requests

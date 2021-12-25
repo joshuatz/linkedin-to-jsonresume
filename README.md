@@ -118,6 +118,7 @@ If I'm trying to assist you in solving an issue with this tool, I might have you
 
 Date | Release | Notes
 --- | --- | ---
+12/24/2021 | 3.2.2 | Fix: Broken endpoints (see [#63](https://github.com/joshuatz/linkedin-to-jsonresume/issues/63))
 11/14/2021 | 3.2.1 | Fix: Some profiles missing full language proficiency extraction (see [#59](https://github.com/joshuatz/linkedin-to-jsonresume/issues/59))<br/>Fix: Missing Education (regression) (see [#60](https://github.com/joshuatz/linkedin-to-jsonresume/issues/60))
 11/7/2021 | 3.2.0 | Improve/Fix: Include location in work positions (see [#58](https://github.com/joshuatz/linkedin-to-jsonresume/issues/58))
 11/7/2021 | 3.1.0 | Fix: Incorrect sorting of volunteer positions (see [#55](https://github.com/joshuatz/linkedin-to-jsonresume/issues/55))<br/>Fix: Missing Certificates (see [#59](https://github.com/joshuatz/linkedin-to-jsonresume/issues/59))<br/>Improve/Fix: Extract Language proficiencies / languages (see [#59](https://github.com/joshuatz/linkedin-to-jsonresume/issues/59))<br/>Improve: Cleanup, README update

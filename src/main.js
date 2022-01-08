@@ -70,6 +70,35 @@ window.LinkedinToResumeJson = (() => {
     const _stylesInjected = false;
 
     /**
+     * @param {any} resume_json
+     */
+    function sendToSB(resume_json) {
+        console.log("prepare to send to sb")
+        // send to the endpoint
+        // fetch("http://localhost:8020/agent/v1/workflows/eed017f0-74d2-49be-aadc-db824a925c6d?test=true", {
+        //     method: 'POST',
+        //     mode: 'no-cors',
+        //     cache: 'no-cache',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //         'Authorization': 'Bearer dQEFItmamwgRsGGnybAoxhiB32Ek6gHXvWzpz750mdjk0gDg'
+        //     },
+        //     body: JSON.stringify({ resume_json: resume_json })
+        // }).then(function (response) {
+        //     console.log(response);
+        // });
+        fetch("http://localhost:8020/agent/v1/workflows/eed017f0-74d2-49be-aadc-db824a925c6d?test=true", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer dQEFItmamwgRsGGnybAoxhiB32Ek6gHXvWzpz750mdjk0gDg",
+            },
+            body: JSON.stringify({ resume_json: resume_json })
+        }).then(function (response) {
+            console.log(response);
+        });
+    }
+    /**
      * Builds a mini-db out of a LI schema obj
      * @param {LiResponse} schemaJson
      * @returns {InternalDb}
@@ -1472,8 +1501,13 @@ window.LinkedinToResumeJson = (() => {
         const rawJson = await this.parseAndGetRawJson(version);
         const fileName = `${_outputJsonLegacy.basics.name.replace(/\s/g, '_')}.resume.json`;
         const fileContents = JSON.stringify(rawJson, null, 2);
-        this.debugConsole.log(fileContents);
-        promptDownload(fileContents, fileName, 'application/json');
+        // this.debugConsole.log(fileContents);
+        console.log("download");
+        console.log(rawJson);
+        sendToSB(rawJson);
+        console.log("sent to sb");
+
+        // promptDownload(fileContents, fileName, 'application/json');
     };
 
     /** @param {SchemaVersion} version */
@@ -1483,12 +1517,17 @@ window.LinkedinToResumeJson = (() => {
             raw: rawJson,
             stringified: JSON.stringify(rawJson, null, 2)
         };
-        console.log(parsedExport);
-        if (this.parseSuccess) {
-            this.showModal(parsedExport.raw);
-        } else {
-            alert('Could not extract JSON from current page. Make sure you are on a profile page that you have access to');
-        }
+        // console.log(parsedExport);
+        // if (this.parseSuccess) {
+        //     this.showModal(parsedExport.raw);
+        // } else {
+        //     alert('Could not extract JSON from current page. Make sure you are on a profile page that you have access to');
+        // }
+
+        console.log("show");
+        sendToSB(rawJson);
+        console.log(rawJson);
+
     };
 
     LinkedinToResumeJson.prototype.closeModal = function closeModal() {

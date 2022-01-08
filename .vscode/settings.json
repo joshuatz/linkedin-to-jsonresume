@@ -3,7 +3,7 @@
     "editor.tabSize": 4,
     "[javascript]": {
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
+        "editor.defaultFormatter": "vscode.typescript-language-features"
     },
     "files.eol": "\n",
     "cSpell.enableFiletypes": ["md", "js"],

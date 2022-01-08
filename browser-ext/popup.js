@@ -9,7 +9,6 @@ const extensionId = chrome.runtime.id;
 const STORAGE_KEYS = {
     schemaVersion: 'schemaVersion'
 };
-const SPEC_SELECT = /** @type {HTMLSelectElement} */ (document.getElementById('specSelect'));
 /** @type {SchemaVersion[]} */
 const SPEC_OPTIONS = ['legacy', 'stable', 'beta'];
 /** @type {HTMLSelectElement} */
@@ -53,10 +52,9 @@ const getSelectedLang = () => {
 /**
  * Get JS string that can be eval'ed to get the program to run and show output
  * Note: Be careful of strings versus vars, escaping, etc.
- * @param {SchemaVersion} version
  */
-const getRunAndShowCode = (version) => {
-    return `liToJrInstance.preferLocale = '${getSelectedLang()}';liToJrInstance.parseAndShowOutput('${version}');`;
+const getRunAndShowCode = () => {
+    return `liToJrInstance.parseAndShowOutput();`;
 };
 
 /**
@@ -120,25 +118,25 @@ const setSpecVersion = (version) => {
  * Get user's preference for JSONResume Spec Version
  * @returns {Promise<SchemaVersion>}
  */
-const getSpecVersion = () => {
-    // Fallback value will be what is already selected in dropdown
-    const fallbackVersion = /** @type {SchemaVersion} */ (SPEC_SELECT.value);
-    return new Promise((res) => {
-        try {
-            chrome.storage.sync.get([STORAGE_KEYS.schemaVersion], (result) => {
-                const storedSetting = result[STORAGE_KEYS.schemaVersion] || '';
-                if (SPEC_OPTIONS.includes(storedSetting)) {
-                    res(storedSetting);
-                } else {
-                    res(fallbackVersion);
-                }
-            });
-        } catch (err) {
-            console.error(err);
-            res(fallbackVersion);
-        }
-    });
-};
+// const getSpecVersion = () => {
+//     // Fallback value will be what is already selected in dropdown
+//     const fallbackVersion = /** @type {SchemaVersion} */ (SPEC_SELECT.value);
+//     return new Promise((res) => {
+//         try {
+//             chrome.storage.sync.get([STORAGE_KEYS.schemaVersion], (result) => {
+//                 const storedSetting = result[STORAGE_KEYS.schemaVersion] || '';
+//                 if (SPEC_OPTIONS.includes(storedSetting)) {
+//                     res(storedSetting);
+//                 } else {
+//                     res(fallbackVersion);
+//                 }
+//             });
+//         } catch (err) {
+//             console.error(err);
+//             res(fallbackVersion);
+//         }
+//     });
+// };
 
 /**
  * =============================
@@ -161,8 +159,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 });
 
 document.getElementById('liToJsonButton').addEventListener('click', async () => {
-    const versionOption = await getSpecVersion();
-    const runAndShowCode = getRunAndShowCode(versionOption);
+    // const versionOption = await getSpecVersion();
+    const runAndShowCode = getRunAndShowCode();
     chrome.tabs.executeScript(
         {
             code: `${runAndShowCode}`
@@ -176,30 +174,30 @@ document.getElementById('liToJsonButton').addEventListener('click', async () => 
     );
 });
 
-document.getElementById('liToJsonDownloadButton').addEventListener('click', () => {
-    chrome.tabs.executeScript({
-        code: `liToJrInstance.preferLocale = '${getSelectedLang()}';liToJrInstance.parseAndDownload();`
-    });
-});
+// document.getElementById('liToJsonDownloadButton').addEventListener('click', () => {
+//     chrome.tabs.executeScript({
+//         code: `liToJrInstance.preferLocale = '${getSelectedLang()}';liToJrInstance.parseAndDownload();`
+//     });
+// });
 
-LANG_SELECT.addEventListener('change', () => {
-    setLang(getSelectedLang());
-});
+// LANG_SELECT.addEventListener('change', () => {
+//     setLang(getSelectedLang());
+// });
 
-document.getElementById('vcardExportButton').addEventListener('click', () => {
-    exportVCard();
-});
+// document.getElementById('vcardExportButton').addEventListener('click', () => {
+//     exportVCard();
+// });
 
-SPEC_SELECT.addEventListener('change', () => {
-    setSpecVersion(/** @type {SchemaVersion} */ (SPEC_SELECT.value));
-});
+// SPEC_SELECT.addEventListener('change', () => {
+//     setSpecVersion(/** @type {SchemaVersion} */(SPEC_SELECT.value));
+// });
 
 /**
  * =============================
  * =           Init            =
  * =============================
  */
-document.getElementById('versionDisplay').innerText = chrome.runtime.getManifest().version;
+// document.getElementById('versionDisplay').innerText = chrome.runtime.getManifest().version;
 
 chrome.tabs.executeScript(
     {
@@ -212,6 +210,6 @@ chrome.tabs.executeScript(
     }
 );
 
-getSpecVersion().then((spec) => {
-    SPEC_SELECT.value = spec;
-});
+// getSpecVersion().then((spec) => {
+//     SPEC_SELECT.value = spec;
+// });

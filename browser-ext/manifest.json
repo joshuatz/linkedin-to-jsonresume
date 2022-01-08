@@ -1,6 +1,6 @@
 {
-    "name": "JSON Resume Exporter",
-    "description": "Export a profile page to JSON Resume",
+    "name": "Save linkedin profile",
+    "description": "Export a linkedin profile to superblocks",
     "manifest_version": 2,
     "icons": {
         "16": "icon-16.png",

@@ -615,10 +615,18 @@ window.LinkedinToResumeJson = (() => {
             // Parse work
             // First, check paging data
             let allWorkCanBeCaptured = true;
-            const positionView = db.getValueByKey([..._liTypeMappings.workPositionGroups.tocKeys, ..._liTypeMappings.workPositions.tocKeys]);
-            if (positionView.paging) {
-                const { paging } = positionView;
-                allWorkCanBeCaptured = paging.start + paging.count >= paging.total;
+            // Work can be grouped in multiple ways - check all
+            // this is [positionView, positionGroupView]
+            const views = [_liTypeMappings.workPositionGroups.tocKeys, _liTypeMappings.workPositions.tocKeys].map(db.getValueByKey);
+            for (let x = 0; x < views.length; x++) {
+                const view = views[x];
+                if (view && view.paging) {
+                    const { paging } = view;
+                    if (paging.start + paging.count >= paging.total !== true) {
+                        allWorkCanBeCaptured = false;
+                        break;
+                    }
+                }
             }
             if (allWorkCanBeCaptured) {
                 _this.getWorkPositions(db).forEach((position) => {

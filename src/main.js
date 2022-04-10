@@ -1349,7 +1349,7 @@ window.LinkedinToResumeJson = (() => {
      * @param {string} [optLocale] preferred locale. Defaults to instance.preferLocale
      * @returns {Promise<ParseProfileSchemaResultSummary>} profile object response summary
      */
-    LinkedinToResumeJson.prototype.getParsedProfile = async function getParsedProfile(useCache = true, optLocale) {
+    LinkedinToResumeJson.prototype.getParsedProfile = async function getParsedProfile(useCache = true, optLocale = undefined) {
         const localeToUse = optLocale || this.preferLocale;
         const localeMatchesUser = !localeToUse || localeToUse === _defaultLocale;
 

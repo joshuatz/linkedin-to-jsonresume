@@ -14,7 +14,7 @@ import {
     lazyCopy,
     liDateToJSDate,
     noNullOrUndef,
-    parseDate,
+    parseStartDate,
     promptDownload,
     setQueryParams,
     urlToBase64,
@@ -719,7 +719,7 @@ window.LinkedinToResumeJson = (() => {
                 // profileView vs dash key
                 const issueDateObject = award.issueDate || award.issuedOn;
                 if (issueDateObject && typeof issueDateObject === 'object') {
-                    parsedAward.date = parseDate(issueDateObject);
+                    parsedAward.date = parseStartDate(issueDateObject);
                 }
                 _outputJsonLegacy.awards.push(parsedAward);
                 _outputJsonStable.awards.push(parsedAward);
@@ -740,7 +740,7 @@ window.LinkedinToResumeJson = (() => {
                 // profileView vs dash key
                 const publicationDateObj = publication.date || publication.publishedOn;
                 if (publicationDateObj && typeof publicationDateObj === 'object' && typeof publicationDateObj.year !== 'undefined') {
-                    parsedPublication.releaseDate = parseDate(publicationDateObj);
+                    parsedPublication.releaseDate = parseStartDate(publicationDateObj);
                 }
                 _outputJsonLegacy.publications.push(parsedPublication);
                 _outputJsonStable.publications.push({

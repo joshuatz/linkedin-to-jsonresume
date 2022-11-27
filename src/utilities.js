@@ -1,4 +1,4 @@
-/** @type {{[key: number]: number}} */
+/** @type {Record<number,number>} */
 export const maxDaysOfMonth = {
     1: 31,
     2: 28,
@@ -28,39 +28,65 @@ export function zeroLeftPad(n) {
 }
 
 /**
- * Returns month, padded to two digits
- * @param {Number} [m] month
- * @returns {string} month, padded to two digits
+ * Gets day, 1 if isStart=true else the last day of the month
+ * @param {boolean} isStart
+ * @returns {number} month
  */
-export function getMonthPadded(m) {
-    if (!m) return `12`;
-
-    return zeroLeftPad(m);
+function getDefaultMonth(isStart) {
+    return isStart ? 1 : 12;
 }
 
 /**
- * Gets day, padded to two digits
- * @param {Number} d day
- * @param {Number} m month
- * @returns {string} day, padded to two digits
+ * Gets day, 1 if isStart=true else the last day of the month
+ * @param {Number} month
+ * @param {boolean} isStart
+ * @returns {number} day
  */
-export function getDayPadded(d, m) {
-    if (!d) {
-        if (!m) return `31`;
-        return maxDaysOfMonth[m].toString();
-    }
-
-    return zeroLeftPad(d);
+function getDefaultDay(month, isStart) {
+    return isStart ? 1 : maxDaysOfMonth[month];
 }
 
 /**
  * Parses an object with year, month and day and returns a string with the date.
- * If month is not present, should return 12, and if day is not present, should return last month day.
+ * @param {LiDate} dateObj
+ * @param {boolean} isStart
+ * @returns {string} Date, as string, formatted for JSONResume
+ */
+function parseDate(dateObj, isStart) {
+    const year = dateObj?.year;
+
+    if (year === undefined) {
+        return '';
+    }
+
+    const month = dateObj.month ?? getDefaultMonth(isStart);
+    const day = dateObj.day ?? getDefaultDay(month, isStart);
+
+    return `${year}-${zeroLeftPad(month)}-${zeroLeftPad(day)}`;
+}
+
+/**
+ * Parses an object with year, month and day and returns a string with the date.
+ * - If month is not present, should return 1.
+ * - If day is not present, should return 1.
+ *
  * @param {LiDate} dateObj
  * @returns {string} Date, as string, formatted for JSONResume
  */
-export function parseDate(dateObj) {
-    return dateObj && dateObj.year ? `${dateObj.year}-${getMonthPadded(dateObj.month)}-${getDayPadded(dateObj.day, dateObj.month)}` : '';
+export function parseStartDate(dateObj) {
+    return parseDate(dateObj, true);
+}
+
+/**
+ * Parses an object with year, month and day and returns a string with the date.
+ * - If month is not present, should return 12.
+ * - If day is not present, should return last month day.
+ *
+ * @param {LiDate} dateObj
+ * @returns {string} Date, as string, formatted for JSONResume
+ */
+export function parseEndDate(dateObj) {
+    return parseDate(dateObj, false);
 }
 
 /**
@@ -70,7 +96,7 @@ export function parseDate(dateObj) {
  */
 export function liDateToJSDate(liDateObj) {
     // This is a cheat; by passing string + 00:00, we can force Date to not offset (by timezone), and also treat month as NOT zero-indexed, which is how LI uses it
-    return new Date(`${parseDate(liDateObj)} 00:00`);
+    return new Date(`${parseStartDate(liDateObj)} 00:00`);
 }
 
 /**
@@ -269,10 +295,10 @@ export function parseAndAttachResumeDates(resumeObj, liEntity) {
         const start = timePeriod.startDate || timePeriod.start;
         const end = timePeriod.endDate || timePeriod.end;
         if (end) {
-            resumeObj.endDate = parseDate(end);
+            resumeObj.endDate = parseEndDate(end);
         }
         if (start) {
-            resumeObj.startDate = parseDate(start);
+            resumeObj.startDate = parseStartDate(start);
         }
     }
 }

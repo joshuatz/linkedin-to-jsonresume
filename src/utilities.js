@@ -32,7 +32,7 @@ export function zeroLeftPad(n) {
  * @param {boolean} isStart
  * @returns {number} month
  */
- function getDefaultMonth(isStart) {
+function getDefaultMonth(isStart) {
     return isStart ? 1 : 12;
 }
 
@@ -69,7 +69,7 @@ function parseDate(dateObj, isStart) {
  * Parses an object with year, month and day and returns a string with the date.
  * - If month is not present, should return 1.
  * - If day is not present, should return 1.
- * 
+ *
  * @param {LiDate} dateObj
  * @returns {string} Date, as string, formatted for JSONResume
  */
@@ -81,7 +81,7 @@ export function parseStartDate(dateObj) {
  * Parses an object with year, month and day and returns a string with the date.
  * - If month is not present, should return 12.
  * - If day is not present, should return last month day.
- * 
+ *
  * @param {LiDate} dateObj
  * @returns {string} Date, as string, formatted for JSONResume
  */

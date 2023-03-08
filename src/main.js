@@ -542,12 +542,12 @@ window.LinkedinToResumeJson = (() => {
                 }
             });
             // Merge with main profile language, while preventing duplicate
-            languages = [
-                ..._outputJsonStable.languages.filter((e) => {
-                    return !languages.find((l) => l.language === e.language);
-                }),
-                ...languages
-            ];
+            // languages = [
+            //     ..._outputJsonStable.languages.filter((e) => {
+            //         return !languages.find((l) => l.language === e.language);
+            //     }),
+            //     ...languages
+            // ];
             _outputJsonLegacy.languages = languages;
             _outputJsonStable.languages = languages;
             resultSummary.sections.languages = languages.length ? 'success' : 'empty';

@@ -44,7 +44,7 @@ The 10/31/2021 release of this extension (`v3.0.0`) changes the default shape of
 
 ## Usage / Installation Options:
 There are (or *were*) a few different options for how to use this:
- - **Fast and simple**: Chrome Extension - [Get it here](https://chrome.google.com/webstore/detail/jcaldklkmnjfpjaboilcejindjejbklh/)
+ - **Fast and simple**: Chrome Extension - [Get it here](https://chrome.google.com/webstore/detail/json-resume-exporter/caobgmmcpklomkcckaenhjlokpmfbdec)
      - Feel free to install, use, and then immediately uninstall if you just need a single export
      - No data is collected
  - [***Deprecated***] (at least for now): Bookmarklet

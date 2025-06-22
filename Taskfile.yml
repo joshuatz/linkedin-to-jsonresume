@@ -1,0 +1,52 @@
+### @file ###
+#
+# This is a "Taskfile", for use with the `task` (aka `go-task`) runner.
+# It supports cross-platform scripting, task dependency / fingerprinting, and more.
+# See: https://github.com/go-task/task
+#
+# Many tasks are automatically run together, via dependency arrays, so you don't
+# have to remember to manually do things like install dependencies, re-build, etc.
+#
+# Tips:
+# - Use `task TASK_NAME` to run a specific task
+# - Use `task --list-all` in the project root to list all tasks.
+# - For a given task:
+#     - Use `--summary` to show the description / help.
+#     - Use `--force` to force the task to re-run, even if computed deps haven't changed.
+#############
+version: '3'
+
+silent: true
+
+tasks:
+  #============================================================#
+  #======================= Help ===============================#
+  #============================================================#
+  default: task --list-all
+  #============================================================#
+  #================= Setup / install ==========================#
+  #============================================================#
+  install:
+    sources:
+      - package-lock.json
+    cmd: npm ci
+  build:prep:
+    deps: [install]
+    cmd: node ./build-scripts/prep-dirs.js
+  build:webpack:
+    deps: [install, build:prep]
+    cmd: |
+      : ${TARGET:="prod"}
+      npx webpack --config "webpack.${TARGET}.js"
+  #============================================================#
+  #================= Running / Building =======================#
+  #============================================================#
+  build:bookmarklet:
+    deps: [build:webpack]
+    cmd: node ./build-scripts/build-bookmarklet.js
+  build:browserext:
+    deps: [build:webpack]
+    cmd: node ./build-scripts/prep-browserext.js
+  package:browserext:
+    deps: [build:browserext]
+    cmd: ./build-scripts/package-browserext.js

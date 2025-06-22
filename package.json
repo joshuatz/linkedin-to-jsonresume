@@ -1,6 +1,6 @@
 {
     "name": "linkedin-to-json-resume-exporter",
-    "version": "3.2.3",
+    "version": "3.3.0",
     "description": "Browser tool to grab details from your open LinkedIn profile page and export to JSON Resume Schema",
     "private": true,
     "main": "src/main.js",
@@ -8,15 +8,7 @@
         "test": "\"Error: no test specified\" && exit 1",
         "lint": "eslint \"**/*.{js,ts}\"",
         "lint:fix": "eslint \"**/*.{js,ts}\" --fix",
-        "type-check": "tsc --noEmit",
-        "babel": "babel src --out-dir build",
-        "webpack": "npx webpack --config webpack.prod.js",
-        "webpack:debug": "npx webpack --config webpack.dev.js",
-        "build:bookmarklet": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/build-bookmarklet.js",
-        "build:browserext": "node ./build-scripts/prep-dirs.js && npm run webpack && node ./build-scripts/prep-browserext.js",
-        "build:browserext-debug": "node ./build-scripts/prep-dirs.js && npm run webpack:debug && node ./build-scripts/prep-browserext.js",
-        "package:browserext": "node ./build-scripts/prep-dirs.js && npm run build:browserext && node ./build-scripts/package-browserext.js",
-        "copy:debug-js-win": "npm run build:browserext-debug && less build/main.js | CLIP"
+        "type-check": "tsc --noEmit"
     },
     "author": {
         "name": "Joshua Tzucker",
@@ -24,31 +16,30 @@
     },
     "license": "MIT",
     "devDependencies": {
-        "@babel/cli": "^7.17.6",
-        "@babel/core": "^7.17.9",
-        "@babel/plugin-transform-runtime": "^7.17.0",
-        "@babel/preset-env": "^7.16.11",
-        "@babel/runtime": "^7.17.9",
-        "@types/archiver": "^5.3.1",
-        "@types/chrome": "0.0.180",
-        "@types/fs-extra": "^9.0.13",
-        "@typescript-eslint/eslint-plugin": "^5.18.0",
-        "@typescript-eslint/parser": "^5.18.0",
-        "archiver": "^5.3.0",
-        "babel-loader": "^8.2.4",
+        "@babel/cli": "^7.27.2",
+        "@babel/core": "^7.27.4",
+        "@babel/plugin-transform-runtime": "^7.27.4",
+        "@babel/preset-env": "^7.27.2",
+        "@babel/runtime": "^7.27.4",
+        "@types/archiver": "^6.0.3",
+        "@types/chrome": "0.0.326",
+        "@types/fs-extra": "^11.0.4",
+        "@typescript-eslint/eslint-plugin": "^8.33.0",
+        "@typescript-eslint/parser": "^8.33.0",
+        "archiver": "^7.0.1",
+        "babel-loader": "^10.0.0",
         "bookmarklet": "",
-        "eslint": "^8.13.0",
-        "eslint-config-airbnb-base": "^15.0.0",
-        "eslint-config-prettier": "^8.5.0",
-        "eslint-import-resolver-typescript": "^2.7.1",
-        "eslint-plugin-import": "^2.26.0",
-        "eslint-plugin-prettier": "^4.0.0",
-        "fs-extra": "^10.0.1",
-        "prettier": "^2.6.2",
-        "replace": "^1.2.1",
-        "typescript": "^4.6.3",
-        "webpack": "^5.72.0",
-        "webpack-cli": "^4.9.2"
+        "eslint": "^9.28.0",
+        "eslint-config-prettier": "^10.1.5",
+        "eslint-import-resolver-typescript": "^4.4.2",
+        "eslint-plugin-import": "^2.31.0",
+        "eslint-plugin-prettier": "^5.4.1",
+        "fs-extra": "^11.3.0",
+        "prettier": "^3.5.3",
+        "replace": "^1.2.2",
+        "typescript": "^5.8.3",
+        "webpack": "^5.99.9",
+        "webpack-cli": "^6.0.1"
     },
     "babel": {
         "plugins": [
@@ -60,10 +51,7 @@
                 {
                     "targets": {
                         "browsers": "defaults"
-                    },
-                    "include": [
-                        "transform-regenerator"
-                    ]
+                    }
                 }
             ]
         ]

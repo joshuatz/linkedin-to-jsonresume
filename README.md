@@ -151,21 +151,26 @@ Date | Release | Notes
 ---
 
 ## Development
+
+> This project uses [`task` (aka `go-task`)](https://github.com/go-task/task) for developer task management and execution. [The `Taskfile.yml` file](./Taskfile.yml) serves as a way to organize these commands, as well as a form of documentation and easy entrypoint into getting started with the project.
+
+You can use `task --list-all` to see all available `task` commands.
+
 > With the rewrite to a browser extension, I actually configured the build scripts to be able to still create a bookmarklet from the same codebase, in case the bookmarklet ever becomes a viable option again.
 
 ### Building the browser extension
-`npm run build-browserext` will transpile and copy all the right files to `./build-browserext`, which you can then side-load into your browser. If you want to produce a single ZIP archive for the extension, `npm run package-browserext` will do that.
+`task build:browserext` will transpile and copy all the right files to `./build-browserext`, which you can then side-load into your browser. If you want to produce a single ZIP archive for the extension, `task package:browserext` will do that.
 
-> Use `build-browserext-debug` for a source-map debug version. To get more console output, append `li2jr_debug=true` to the query string of the LI profile you are using the tool with.
+> Use `TARGET=dev task build:browserext` for a source-map debug version. To get more console output, append `li2jr_debug=true` to the query string of the LI profile you are using the tool with.
 
 ### Building the bookmarklet version
 Currently, the build process looks like this:
  - `src/main.js` -> (`webpack + babel`) -> `build/main.js` -> [`mrcoles/bookmarklet`](https://github.com/mrcoles/bookmarklet) -> `build/bookmarklet_export.js` -> `build/install-page.html`
      - The bookmark can then be dragged to your bookmarks from the final `build/install-page.html`
 
-All of the above should happen automatically when you do `npm run build-bookmarklet`.
+All of the above should happen automatically when you do `task build:bookmarklet`.
 
-If this ever garners enough interest and needs to be updated, I will probably want to re-write it with TypeScript to make it more maintainable. 
+If this ever garners enough interest and needs to be updated, I will probably want to re-write it with TypeScript to make it more maintainable.
 
 ### LinkedIn Documentation
 For understanding some peculiarities of the LI API, see [LinkedIn-Dev-Notes-README.md](./docs/LinkedIn-Dev-Notes-README.md).

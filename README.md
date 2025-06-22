@@ -2,7 +2,11 @@
 
 > An extremely easy-to-use browser extension for exporting your full LinkedIn Profile to a JSON Resume file or string.
 
-## Chrome Extension 📦 - [Webstore Link](https://chrome.google.com/webstore/detail/json-resume-exporter/caobgmmcpklomkcckaenhjlokpmfbdec)
+<!-- Non-functional until chrome extension is fixed -->
+<!-- ## Chrome Extension 📦 - [Webstore Link](https://chrome.google.com/webstore/detail/json-resume-exporter/caobgmmcpklomkcckaenhjlokpmfbdec) -->
+
+
+## Bookmarklet: [Installer Page](https://li2jr-bookmarklet-installer.tiiny.site/)
 
 ## My LinkedIn Profile 👨‍💼 - [linkedin.com/in/joshuatzucker/](https://www.linkedin.com/in/joshuatzucker/)
 
@@ -23,33 +27,23 @@ However, I have gotten several feature requests (as both issues and emails) aski
 
 ---
 
-## Breaking Change - `v1.0` Schema Update
-The 10/31/2021 release of this extension (`v3.0.0`) changes the default shape of the JSON exported by this tool, to adhere to the newer `v1` schema offered by JSON Resume:
-
-<details>
-	<summary>Previously</summary>
-
-- Stable: `v0.0.16`
-- Latest: `v0.1.3`
-- Beta: `v0.1.3` + `certificates`
-</details>
-
-<details>
-	<summary>Version 3.0.0</summary>
-
-- ***Legacy***: `v0.0.16`
-- Stable: `v1.0.0`
-- Beta: Even with `v1.0.0` (for now)
-</details>
-
 ## Usage / Installation Options:
+
 There are (or *were*) a few different options for how to use this:
- - **Fast and simple**: Chrome Extension - [Get it here](https://chrome.google.com/webstore/detail/json-resume-exporter/caobgmmcpklomkcckaenhjlokpmfbdec)
-     - Feel free to install, use, and then immediately uninstall if you just need a single export
-     - No data is collected
- - [***Deprecated***] (at least for now): Bookmarklet
-     - This was originally how this tool worked, but had to be retired as a valid method when LinkedIn added a stricter CSP that prevented it from working
-     - Code to generate the bookmarklet is still in this repo if LI ever loosens the CSP
+
+- **Fast and simple**: bookmarklet
+    1. Go to [this installer page](https://li2jr-bookmarklet-installer.tiiny.site/)
+    2. Drag and drop the indicated link in the page to your bookmarks (toolbar)
+    3. Navigate to your LinkedIn profile
+    4. Click the bookmarklet, and then a modal should pop up with the exported JSON
+- **Unsupported for now**: Chrome Extension
+    - Currently, this is only supported via [sideloading](#chrome-side-loading-instructions), since the extension has not yet been updated to be compatible with Google's manifest v3 requirements. See [Issue #81](https://github.com/joshuatz/linkedin-to-jsonresume/issues/81) for details.
+
+<details>
+    <summary><h2 style="display:inline;">Advanced Features (broken until extension fixed)</h2></summary>
+
+> [!WARNING]
+> The following features are only supported inside the browser extension version of the program, which is currently broken. For details, see [Issue #81](https://github.com/joshuatz/linkedin-to-jsonresume/issues/81).
 
 ### Schema Versions
 This tool supports multiple version of [the JSON Resume Schema specification](https://github.com/jsonresume/resume-schema) for export, which you can easily swap between in the dropdown selector! ✨
@@ -86,6 +80,8 @@ There are several main buttons in the browser extension, with different effects.
      - See [#32](https://github.com/joshuatz/linkedin-to-jsonresume/issues/32) for details
  - The LinkedIn display photo (included in vCard) served by LI is a temporary URL, with a fixed expiration date set by LinkedIn. From observations, this is often set months into the future, but could still be problematic for address book clients that don't cache images. To work around this, I'm converting it to a base64 string; this should work with most vCard clients, but also increases the vCard file size considerably.
 
+</details>
+
 ### Chrome Side-loading Instructions
 Instead of installing from the Chrome Webstore, you might might want to "side-load" a ZIP build for either local development, or to try out a new release that has not yet made it through the Chrome review process. Here are the instructions for doing so:
 
@@ -118,6 +114,7 @@ If I'm trying to assist you in solving an issue with this tool, I might have you
 
 Date | Release | Notes
 --- | --- | ---
+6/22/2025 | 3.3.0 | Re-implement bookmarklet support, add docs about broken Chrome extension usage
 4/9/2022 | 3.2.3 | Fix: Incomplete work listings extraction (see [#68](https://github.com/joshuatz/linkedin-to-jsonresume/issues/68))
 12/24/2021 | 3.2.2 | Fix: Broken endpoints (see [#63](https://github.com/joshuatz/linkedin-to-jsonresume/issues/63))
 11/14/2021 | 3.2.1 | Fix: Some profiles missing full language proficiency extraction (see [#59](https://github.com/joshuatz/linkedin-to-jsonresume/issues/59))<br/>Fix: Missing Education (regression) (see [#60](https://github.com/joshuatz/linkedin-to-jsonresume/issues/60))
@@ -148,6 +145,25 @@ Date | Release | Notes
 6/21/2019 | 0.0.3 | I saw the bookmarklet was broken depending on how you came to the profile page, so I refactored a bunch of code and found a much better way to pull the data. Should be much more reliable!
 </details>
 
+### Breaking Change - `v1.0` Schema Update
+The 10/31/2021 release of this extension (`v3.0.0`) changes the default shape of the JSON exported by this tool, to adhere to the newer `v1` schema offered by JSON Resume:
+
+<details>
+	<summary>Previously</summary>
+
+- Stable: `v0.0.16`
+- Latest: `v0.1.3`
+- Beta: `v0.1.3` + `certificates`
+</details>
+
+<details>
+	<summary>Version 3.0.0</summary>
+
+- ***Legacy***: `v0.0.16`
+- Stable: `v1.0.0`
+- Beta: Even with `v1.0.0` (for now)
+</details>
+
 ---
 
 ## Development
@@ -169,8 +185,6 @@ Currently, the build process looks like this:
      - The bookmark can then be dragged to your bookmarks from the final `build/install-page.html`
 
 All of the above should happen automatically when you do `task build:bookmarklet`.
-
-If this ever garners enough interest and needs to be updated, I will probably want to re-write it with TypeScript to make it more maintainable.
 
 ### LinkedIn Documentation
 For understanding some peculiarities of the LI API, see [LinkedIn-Dev-Notes-README.md](./docs/LinkedIn-Dev-Notes-README.md).

@@ -1521,15 +1521,53 @@ window.LinkedinToResumeJson = (() => {
             _this.injectStyles();
             modalWrapper = document.createElement('div');
             modalWrapper.id = modalWrapperId;
-            modalWrapper.innerHTML = `<div class="${_toolPrefix}_modal">
-                <div class="${_toolPrefix}_topBar">
-                    <div class="${_toolPrefix}_titleText">Profile Export:</div>
-                    <div class="${_toolPrefix}_closeButton">X</div>
-                </div>
-                <div class="${_toolPrefix}_modalBody">
-                    <textarea id="${_toolPrefix}_exportTextField">Export will appear here...</textarea>
-                </div>
-            </div>`;
+
+            // WARNING: The more verbose imperative DOM building, used below, is
+            // used instead of `.innerHTML`, to workaround TrustedHTML restrictions
+            // that LI has embedded into the page policies
+
+            // Create modal container
+            const modal = document.createElement('div');
+            modal.className = `${_toolPrefix}_modal`;
+
+            // Create top bar
+            const topBar = document.createElement('div');
+            topBar.className = `${_toolPrefix}_topBar`;
+
+            // Create title text
+            const titleText = document.createElement('div');
+            titleText.className = `${_toolPrefix}_titleText`;
+            titleText.textContent = 'Profile Export:';
+
+            // Create close button
+            const closeButton = document.createElement('div');
+            closeButton.className = `${_toolPrefix}_closeButton`;
+            closeButton.textContent = 'X';
+
+            // Append title and close button to top bar
+            topBar.appendChild(titleText);
+            topBar.appendChild(closeButton);
+
+            // Create modal body
+            const modalBody = document.createElement('div');
+            modalBody.className = `${_toolPrefix}_modalBody`;
+
+            // Create textarea
+            const textarea = document.createElement('textarea');
+            textarea.id = `${_toolPrefix}_exportTextField`;
+            textarea.textContent = 'Export will appear here...';
+
+            // Append textarea to modal body
+            modalBody.appendChild(textarea);
+
+            // Assemble modal
+            modal.appendChild(topBar);
+            modal.appendChild(modalBody);
+
+            // Append modal to wrapper
+            modalWrapper.appendChild(modal);
+
+            // Append wrapper to body
             document.body.appendChild(modalWrapper);
             // Add event listeners
             modalWrapper.addEventListener('click', (evt) => {
@@ -1542,8 +1580,6 @@ window.LinkedinToResumeJson = (() => {
             modalWrapper.querySelector(`.${_toolPrefix}_closeButton`).addEventListener('click', () => {
                 _this.closeModal();
             });
-            /** @type {HTMLTextAreaElement} */
-            const textarea = modalWrapper.querySelector(`#${_toolPrefix}_exportTextField`);
             textarea.addEventListener('click', () => {
                 textarea.select();
             });
